@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /Users/mothproduction/Documents/VSCode/StringLife-VST/StringLife/build/_deps/juce-src -iname *AudioTransportSource*)",
+      "Bash(find /Users/mothproduction/Documents/VSCode/StringLife-VST/StringLife/build/_deps/juce-src -iname *AudioFormatReaderSource*)",
+      "Bash(cmake -B build)",
+      "Bash(cmake --build build --config Release -j 8)",
+      "Bash(auval -v augn AFP1 MthP)",
+      "Bash(open /Users/mothproduction/Documents/VSCode/StringLife-VST/AudioFilePlayer/build/AudioFilePlayer_artefacts/Standalone/AudioFilePlayer.app)",
+      "Bash(screencapture -x /private/tmp/claude-501/-Users-mothproduction-Documents-VSCode-StringLife-VST/c610e684-2798-48b5-8266-8f3c489a865e/scratchpad/afp_1.png)",
+      "Bash(osascript -e 'tell application \"AudioFilePlayer\" to quit')",
+      "Bash(pkill -f \"AudioFilePlayer_artefacts/Standalone/AudioFilePlayer\")",
+      "Bash(cmake --build build --config Release -j 8 --target AudioFilePlayer_Standalone)",
+      "Read(//Users/mothproduction/Library/Audio/Plug-Ins/VST3/StringLife.vst3/Contents/Resources/**)",
+      "Bash(/usr/libexec/PlistBuddy -c \"Print :CFBundleGetInfoString\" ~/Library/Audio/Plug-Ins/Components/StringLife.component/Contents/Info.plist)",
+      "Bash(/usr/libexec/PlistBuddy -c \"Print :CFBundleGetInfoString\" ~/Library/Audio/Plug-Ins/Components/AudioFilePlayer.component/Contents/Info.plist)",
+      "Read(//Users/mothproduction/Library/Audio/Plug-Ins/Components/StringLife.component/Contents/**)",
+      "Bash(python3 -m json.tool)",
+      "Bash(auval -v aufx SLf1 MthP)",
+      "Bash(osascript -e 'tell application \"StringLife\" to quit')",
+      "Bash(pkill -f \"StringLife_artefacts/Standalone/StringLife\")",
+      "Bash(rm -f \"/Users/mothproduction/Library/Application Support/StringLife.settings\")",
+      "Bash(open /Users/mothproduction/Documents/VSCode/StringLife-VST/StringLife/build/StringLife_artefacts/Standalone/StringLife.app)",
+      "Bash(screencapture -x /private/tmp/claude-501/-Users-mothproduction-Documents-VSCode-StringLife-VST/c610e684-2798-48b5-8266-8f3c489a865e/scratchpad/sl_ab_diag.png)",
+      "Bash(open build/StringLife_artefacts/Standalone/StringLife.app)",
+      "Bash(screencapture -x /private/tmp/claude-501/-Users-mothproduction-Documents-VSCode-StringLife-VST/c610e684-2798-48b5-8266-8f3c489a865e/scratchpad/sl_ab2.png)",
+      "Bash(rm -f \"/Users/mothproduction/Library/Application Support/AudioFilePlayer.settings\")",
+      "Bash(open build/AudioFilePlayer_artefacts/Standalone/AudioFilePlayer.app)",
+      "Bash(screencapture -x /private/tmp/claude-501/-Users-mothproduction-Documents-VSCode-StringLife-VST/c610e684-2798-48b5-8266-8f3c489a865e/scratchpad/afp_timeline.png)",
+      "Bash(screencapture -x /private/tmp/claude-501/-Users-mothproduction-Documents-VSCode-StringLife-VST/c610e684-2798-48b5-8266-8f3c489a865e/scratchpad/afp_timeline2.png)",
+      "Bash(sips -c 620 620 StringLife/Assets/knob_face.png --out /tmp/knob_face_crop_test2.png)",
+      "Read(//tmp/**)",
+      "Read(//private/tmp/**)",
+      "Bash(cp /tmp/knob_face_crop_test2.png /Users/mothproduction/Documents/VSCode/StringLife-VST/StringLife/Assets/knob_face.png *)"
+    ],
+    "additionalDirectories": [
+      "/private/tmp"
+    ]
+  }
+}

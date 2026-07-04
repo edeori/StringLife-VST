@@ -1,0 +1,465 @@
+#include "PluginEditor.h"
+#include "StringLifeFonts.h"
+#include "BinaryData.h"
+#include <array>
+
+namespace
+{
+    constexpr float panelCornerSize = 10.0f;
+    constexpr float panelInset = 18.0f;
+}
+
+//==============================================================================
+LevelMeter::LevelMeter (std::function<float()> levelDbProviderIn)
+    : levelDbProvider (std::move (levelDbProviderIn))
+{
+    startTimerHz (30);
+}
+
+LevelMeter::~LevelMeter()
+{
+    stopTimer();
+}
+
+void LevelMeter::timerCallback()
+{
+    displayedLevelDb = levelDbProvider ? levelDbProvider() : minDb;
+
+    if (displayedLevelDb >= peakHoldDb)
+    {
+        peakHoldDb = displayedLevelDb;
+        peakHoldCounter = 0;
+    }
+    else if (++peakHoldCounter > 30) // ~1 second hold at 30Hz before decaying
+    {
+        peakHoldDb = juce::jmax (minDb, peakHoldDb - 0.5f);
+    }
+
+    repaint();
+}
+
+void LevelMeter::paint (juce::Graphics& g)
+{
+    auto bounds = getLocalBounds().toFloat();
+
+    g.setColour (juce::Colour (0xff0c0d0f));
+    g.fillRoundedRectangle (bounds, 2.0f);
+
+    auto normalise = [] (float db)
+    {
+        return juce::jlimit (0.0f, 1.0f, (db - minDb) / (maxDb - minDb));
+    };
+
+    auto levelFraction = normalise (displayedLevelDb);
+    auto meterBounds = bounds.withTop (bounds.getBottom() - bounds.getHeight() * levelFraction);
+    g.setColour (StringLifeLookAndFeel::getAccentColour());
+    g.fillRoundedRectangle (meterBounds, 2.0f);
+
+    auto peakY = bounds.getBottom() - bounds.getHeight() * normalise (peakHoldDb);
+    g.setColour (juce::Colours::white);
+    g.fillRect (bounds.getX(), peakY - 1.0f, bounds.getWidth(), 2.0f);
+
+    g.setColour (juce::Colours::white.withAlpha (0.15f));
+    g.drawRoundedRectangle (bounds, 2.0f, 1.0f);
+}
+
+//==============================================================================
+juce::String StringLifeAudioProcessorEditor::withLetterSpacing (const juce::String& text)
+{
+    juce::String result;
+
+    for (int i = 0; i < text.length(); ++i)
+    {
+        result << text[i];
+
+        if (i < text.length() - 1)
+            result << " ";
+    }
+
+    return result;
+}
+
+StringLifeAudioProcessorEditor::StringLifeAudioProcessorEditor (StringLifeAudioProcessor& p)
+    : AudioProcessorEditor (&p),
+      apvts (p.apvts),
+      inputMeter  ([&p] { return p.getInputLevelDb(); }),
+      outputMeter ([&p] { return p.getOutputLevelDb(); })
+{
+    setLookAndFeel (&lookAndFeel);
+
+    backgroundImage = juce::ImageFileFormat::loadFrom (BinaryData::background_panel_png, (size_t) BinaryData::background_panel_pngSize);
+    logoImage       = juce::ImageFileFormat::loadFrom (BinaryData::moth_logo_png, (size_t) BinaryData::moth_logo_pngSize);
+
+    manufacturerLabel.setText (withLetterSpacing ("MOTH PRODUCTION"), juce::dontSendNotification);
+    manufacturerLabel.setFont (StringLifeFonts::uiLight (10.0f));
+    manufacturerLabel.setColour (juce::Label::textColourId, juce::Colours::grey);
+    addAndMakeVisible (manufacturerLabel);
+
+    titleLabel.setText ("StringLife", juce::dontSendNotification);
+    titleLabel.setFont (StringLifeFonts::title (32.0f));
+    titleLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.95f));
+    addAndMakeVisible (titleLabel);
+
+    subtitleLabel.setText (withLetterSpacing ("STRING RESTORATION TOOL"), juce::dontSendNotification);
+    subtitleLabel.setFont (StringLifeFonts::uiLight (10.5f));
+    subtitleLabel.setColour (juce::Label::textColourId, StringLifeLookAndFeel::getAccentColour().withAlpha (0.85f));
+    addAndMakeVisible (subtitleLabel);
+
+    guitarButton.setClickingTogglesState (false);
+    bassButton.setClickingTogglesState (false);
+    StringLifeLookAndFeel::markAsInstrumentButton (guitarButton);
+    StringLifeLookAndFeel::markAsInstrumentButton (bassButton);
+    guitarButton.onClick = [this] { setChoiceParam (ParamIDs::instrument, 0); };
+    bassButton.onClick   = [this] { setChoiceParam (ParamIDs::instrument, 1); };
+    addAndMakeVisible (guitarButton);
+    addAndMakeVisible (bassButton);
+
+    deadLabel.setText (withLetterSpacing ("DEAD"), juce::dontSendNotification);
+    freshLabel.setText (withLetterSpacing ("FRESH"), juce::dontSendNotification);
+    freshLabel.setJustificationType (juce::Justification::centredRight);
+    for (auto* l : { &deadLabel, &freshLabel })
+    {
+        l->setFont (StringLifeFonts::uiMedium (13.0f));
+        l->setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.7f));
+        addAndMakeVisible (l);
+    }
+
+    stringAgeSlider.setSliderStyle (juce::Slider::LinearHorizontal);
+    stringAgeSlider.setTextBoxStyle (juce::Slider::NoTextBox, true, 0, 0);
+    addAndMakeVisible (stringAgeSlider);
+    stringAgeAttachment = std::make_unique<SliderAttachment> (apvts, ParamIDs::stringAge, stringAgeSlider);
+
+    stringAgeValueLabel.setJustificationType (juce::Justification::centred);
+    stringAgeValueLabel.setFont (StringLifeFonts::numeric (16.0f));
+    stringAgeValueLabel.setColour (juce::Label::textColourId, StringLifeLookAndFeel::getAccentColour());
+    addAndMakeVisible (stringAgeValueLabel);
+
+    auto setupAdvancedSlider = [this] (juce::Slider& slider, juce::Label& nameLabel, juce::Label& valueLabel,
+                                        const juce::String& name)
+    {
+        slider.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
+        slider.setTextBoxStyle (juce::Slider::NoTextBox, true, 0, 0);
+        addAndMakeVisible (slider);
+
+        nameLabel.setText (withLetterSpacing (name), juce::dontSendNotification);
+        nameLabel.setJustificationType (juce::Justification::centred);
+        nameLabel.setFont (StringLifeFonts::uiMedium (12.0f));
+        nameLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.7f));
+        addAndMakeVisible (nameLabel);
+
+        valueLabel.setJustificationType (juce::Justification::centred);
+        valueLabel.setFont (StringLifeFonts::numeric (13.0f));
+        valueLabel.setColour (juce::Label::textColourId, StringLifeLookAndFeel::getAccentColour());
+        addAndMakeVisible (valueLabel);
+    };
+
+    setupAdvancedSlider (presenceSlider, presenceNameLabel, presenceValueLabel, "SPARK");
+    setupAdvancedSlider (attackSlider, attackNameLabel, attackValueLabel, "BITE");
+    setupAdvancedSlider (harmonicSlider, harmonicNameLabel, harmonicValueLabel, "SHIMMER");
+    setupAdvancedSlider (sustainSlider, sustainNameLabel, sustainValueLabel, "BLOOM");
+
+    presenceAttachment = std::make_unique<SliderAttachment> (apvts, ParamIDs::presenceAmount, presenceSlider);
+    attackAttachment   = std::make_unique<SliderAttachment> (apvts, ParamIDs::attackRestore, attackSlider);
+    harmonicAttachment = std::make_unique<SliderAttachment> (apvts, ParamIDs::harmonicExcite, harmonicSlider);
+    sustainAttachment  = std::make_unique<SliderAttachment> (apvts, ParamIDs::sustainShape, sustainSlider);
+
+    monitorLabel.setText (withLetterSpacing ("MONITOR"), juce::dontSendNotification);
+    monitorLabel.setJustificationType (juce::Justification::centred);
+    monitorLabel.setFont (StringLifeFonts::uiMedium (10.5f));
+    monitorLabel.setColour (juce::Label::textColourId, juce::Colours::grey);
+    addAndMakeVisible (monitorLabel);
+
+    normalButton.setClickingTogglesState (false);
+    deltaButton.setClickingTogglesState (false);
+    normalButton.onClick = [this] { setChoiceParam (ParamIDs::monitorMode, 0); };
+    deltaButton.onClick  = [this] { setChoiceParam (ParamIDs::monitorMode, 1); };
+    addAndMakeVisible (normalButton);
+    addAndMakeVisible (deltaButton);
+
+    bypassButton.setClickingTogglesState (true);
+    addAndMakeVisible (bypassButton);
+    bypassAttachment = std::make_unique<ButtonAttachment> (apvts, ParamIDs::bypass, bypassButton);
+
+    abButton.setClickingTogglesState (true);
+    StringLifeLookAndFeel::markAsAlwaysActive (abButton);
+    addAndMakeVisible (abButton);
+    abAttachment = std::make_unique<ButtonAttachment> (apvts, ParamIDs::abCompare, abButton);
+
+    wetDrySlider.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
+    wetDrySlider.setTextBoxStyle (juce::Slider::NoTextBox, true, 0, 0);
+    addAndMakeVisible (wetDrySlider);
+    wetDryAttachment = std::make_unique<SliderAttachment> (apvts, ParamIDs::wetDryMix, wetDrySlider);
+
+    wetDryLabel.setText (withLetterSpacing ("MIX"), juce::dontSendNotification);
+    wetDryLabel.setJustificationType (juce::Justification::centred);
+    wetDryLabel.setFont (StringLifeFonts::uiMedium (10.5f));
+    wetDryLabel.setColour (juce::Label::textColourId, juce::Colours::grey);
+    addAndMakeVisible (wetDryLabel);
+
+    metersLabel.setText (withLetterSpacing ("IN / OUT"), juce::dontSendNotification);
+    metersLabel.setJustificationType (juce::Justification::centred);
+    metersLabel.setFont (StringLifeFonts::uiMedium (10.5f));
+    metersLabel.setColour (juce::Label::textColourId, juce::Colours::grey);
+    addAndMakeVisible (metersLabel);
+
+    addAndMakeVisible (inputMeter);
+    addAndMakeVisible (outputMeter);
+
+    versionLabel.setText ("v" + juce::String (JucePlugin_VersionString), juce::dontSendNotification);
+    versionLabel.setFont (StringLifeFonts::uiLight (9.0f));
+    versionLabel.setColour (juce::Label::textColourId, juce::Colours::grey.withAlpha (0.6f));
+    versionLabel.setJustificationType (juce::Justification::centredRight);
+    addAndMakeVisible (versionLabel);
+
+    updateInstrumentButtons();
+    updateMonitorButtons();
+    updateCompareButtonLabel();
+
+    setSize (560, 500);
+    startTimerHz (30);
+}
+
+StringLifeAudioProcessorEditor::~StringLifeAudioProcessorEditor()
+{
+    stopTimer();
+    setLookAndFeel (nullptr);
+}
+
+void StringLifeAudioProcessorEditor::setChoiceParam (const juce::String& paramID, int choiceIndex)
+{
+    if (auto* param = apvts.getParameter (paramID))
+        param->setValueNotifyingHost (param->convertTo0to1 ((float) choiceIndex));
+}
+
+void StringLifeAudioProcessorEditor::updateInstrumentButtons()
+{
+    auto isBass = apvts.getRawParameterValue (ParamIDs::instrument)->load() > 0.5f;
+    guitarButton.setToggleState (! isBass, juce::dontSendNotification);
+    bassButton.setToggleState (isBass, juce::dontSendNotification);
+}
+
+void StringLifeAudioProcessorEditor::updateMonitorButtons()
+{
+    auto mode = (MonitorMode) juce::roundToInt (apvts.getRawParameterValue (ParamIDs::monitorMode)->load());
+    auto bypassOn = apvts.getRawParameterValue (ParamIDs::bypass)->load() > 0.5f;
+
+    normalButton.setToggleState (mode == MonitorMode::normal, juce::dontSendNotification);
+    deltaButton.setToggleState  (mode == MonitorMode::delta,  juce::dontSendNotification);
+
+    // The wet/dry knob only has an audible effect in Normal mode, and only
+    // when Bypass isn't overriding everything - dim it otherwise so it's
+    // clear it's not doing anything. (setEnabled() alone already mutes
+    // JUCE's own rotary slider colours, so stacking a low setAlpha() on top
+    // of that made it nearly invisible.)
+    auto wetDryActive = mode == MonitorMode::normal && ! bypassOn;
+    wetDrySlider.setEnabled (wetDryActive);
+    wetDryLabel.setEnabled (wetDryActive);
+    wetDrySlider.setAlpha (wetDryActive ? 1.0f : 0.7f);
+    wetDryLabel.setAlpha (wetDryActive ? 1.0f : 0.7f);
+
+    // Nothing below Bypass matters while it's engaged - disable it visually.
+    normalButton.setEnabled (! bypassOn);
+    deltaButton.setEnabled (! bypassOn);
+    abButton.setEnabled (! bypassOn);
+}
+
+void StringLifeAudioProcessorEditor::updateCompareButtonLabel()
+{
+    auto abOn = apvts.getRawParameterValue (ParamIDs::abCompare)->load() > 0.5f;
+    abButton.setButtonText (abOn ? "B" : "A");
+}
+
+void StringLifeAudioProcessorEditor::updateAdvancedLabel (juce::Label& valueLabel, juce::Slider& slider)
+{
+    valueLabel.setText (juce::String (juce::roundToInt (slider.getValue() * 100.0)) + "%",
+                         juce::dontSendNotification);
+}
+
+void StringLifeAudioProcessorEditor::timerCallback()
+{
+    auto ageValue = apvts.getRawParameterValue (ParamIDs::stringAge)->load();
+    stringAgeValueLabel.setText (juce::String (juce::roundToInt (ageValue * 100.0f)) + "% FRESH",
+                                  juce::dontSendNotification);
+
+    updateAdvancedLabel (presenceValueLabel, presenceSlider);
+    updateAdvancedLabel (attackValueLabel, attackSlider);
+    updateAdvancedLabel (harmonicValueLabel, harmonicSlider);
+    updateAdvancedLabel (sustainValueLabel, sustainSlider);
+
+    updateInstrumentButtons();
+    updateMonitorButtons();
+    updateCompareButtonLabel();
+}
+
+void StringLifeAudioProcessorEditor::drawPanelFrame (juce::Graphics& g)
+{
+    auto bounds = getLocalBounds().toFloat();
+
+    if (backgroundImage.isValid())
+    {
+        g.drawImage (backgroundImage, bounds);
+        return;
+    }
+
+    // Procedural fallback, in case the embedded asset ever fails to load.
+    juce::ColourGradient bg (juce::Colour (0xff2a2d32), bounds.getX(), bounds.getY(),
+                             juce::Colour (0xff0e0f11), bounds.getX(), bounds.getBottom(), false);
+    g.setGradientFill (bg);
+    g.fillRoundedRectangle (bounds, panelCornerSize);
+
+    g.setColour (juce::Colours::white.withAlpha (0.07f));
+    g.drawRoundedRectangle (bounds.reduced (1.0f), panelCornerSize, 1.0f);
+
+    g.setColour (juce::Colours::black.withAlpha (0.7f));
+    g.drawRoundedRectangle (bounds.reduced (0.5f), panelCornerSize, 1.0f);
+
+    auto drawScrew = [&g] (juce::Point<float> centre)
+    {
+        constexpr float r = 4.5f;
+        juce::ColourGradient grad (juce::Colour (0xff6a6d73), centre.x - r, centre.y - r,
+                                   juce::Colour (0xff1c1e21), centre.x + r, centre.y + r, false);
+        g.setGradientFill (grad);
+        g.fillEllipse (juce::Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (centre));
+
+        g.setColour (juce::Colours::black.withAlpha (0.7f));
+        g.drawLine (centre.x - r * 0.6f, centre.y + r * 0.3f, centre.x + r * 0.6f, centre.y - r * 0.3f, 1.2f);
+    };
+
+    constexpr float inset = 15.0f;
+    drawScrew ({ inset, inset });
+    drawScrew ({ bounds.getWidth() - inset, inset });
+    drawScrew ({ inset, bounds.getHeight() - inset });
+    drawScrew ({ bounds.getWidth() - inset, bounds.getHeight() - inset });
+}
+
+void StringLifeAudioProcessorEditor::drawLogo (juce::Graphics& g, juce::Rectangle<float> bounds)
+{
+    if (! logoImage.isValid())
+        return;
+
+    g.drawImage (logoImage, bounds, juce::RectanglePlacement::centred);
+}
+
+void StringLifeAudioProcessorEditor::drawMeterScale (juce::Graphics& g)
+{
+    static const std::array<int, 7> dbMarks { 0, -6, -12, -18, -24, -36, -60 };
+
+    g.setColour (juce::Colours::grey.withAlpha (0.6f));
+    g.setFont (juce::Font (juce::FontOptions (8.0f)));
+
+    auto top = (float) meterScaleBounds.getY();
+    auto bottom = (float) meterScaleBounds.getBottom();
+
+    for (auto db : dbMarks)
+    {
+        auto frac = (float) (db + 60) / 60.0f;
+        auto y = bottom - frac * (bottom - top);
+        g.drawText (juce::String (db), meterScaleBounds.getX(), (int) y - 6, meterScaleBounds.getWidth(), 12,
+                    juce::Justification::centredRight);
+    }
+}
+
+void StringLifeAudioProcessorEditor::paint (juce::Graphics& g)
+{
+    drawPanelFrame (g);
+
+    g.setColour (juce::Colours::white.withAlpha (0.08f));
+    g.drawLine (panelInset, (float) dividerY1, (float) getWidth() - panelInset, (float) dividerY1, 1.0f);
+    g.drawLine (panelInset, (float) dividerY2, (float) getWidth() - panelInset, (float) dividerY2, 1.0f);
+
+    // No boxed panel behind Monitor/In-Out any more - buttons, knobs and
+    // meters just sit directly on the plain background panel texture.
+    drawMeterScale (g);
+    drawLogo (g, logoBounds);
+}
+
+void StringLifeAudioProcessorEditor::resized()
+{
+    auto area = getLocalBounds().reduced ((int) panelInset + 4);
+
+    // Header: manufacturer line, then title/subtitle with instrument toggle
+    // to the right.
+    auto manufacturerRow = area.removeFromTop (16);
+    logoBounds = manufacturerRow.removeFromLeft (14).toFloat();
+    manufacturerRow.removeFromLeft (4);
+    versionLabel.setBounds (manufacturerRow.removeFromRight (60));
+    manufacturerLabel.setBounds (manufacturerRow);
+
+    area.removeFromTop (2);
+
+    auto titleRow = area.removeFromTop (48);
+    auto instrumentArea = titleRow.removeFromRight (150);
+    instrumentArea = instrumentArea.withSizeKeepingCentre (instrumentArea.getWidth(), 32);
+    bassButton.setBounds (instrumentArea.removeFromRight (70));
+    instrumentArea.removeFromRight (6);
+    guitarButton.setBounds (instrumentArea.removeFromRight (70));
+
+    titleLabel.setBounds (titleRow.removeFromTop (30));
+    subtitleLabel.setBounds (titleRow);
+
+    area.removeFromTop (8);
+    dividerY1 = area.getY();
+    area.removeFromTop (10);
+
+    // Main string age slider.
+    auto mainArea = area.removeFromTop (70);
+    auto sliderRow = mainArea.removeFromTop (30);
+    deadLabel.setBounds (sliderRow.removeFromLeft (50));
+    freshLabel.setBounds (sliderRow.removeFromRight (50));
+    stringAgeSlider.setBounds (sliderRow.reduced (6, 0));
+    mainArea.removeFromTop (6);
+    stringAgeValueLabel.setBounds (mainArea.removeFromTop (20));
+
+    area.removeFromTop (8);
+    dividerY2 = area.getY();
+    area.removeFromTop (10);
+
+    // Advanced parameter row (Presence | Attack | Harmonic | Sustain).
+    auto advancedArea = area.removeFromTop (110);
+    auto colWidth = advancedArea.getWidth() / 4;
+
+    auto layoutColumn = [] (juce::Rectangle<int> col, juce::Label& name, juce::Slider& slider, juce::Label& value)
+    {
+        name.setBounds (col.removeFromTop (16));
+        value.setBounds (col.removeFromBottom (16));
+        slider.setBounds (col.reduced (8, 0));
+    };
+
+    layoutColumn (advancedArea.removeFromLeft (colWidth), presenceNameLabel, presenceSlider, presenceValueLabel);
+    layoutColumn (advancedArea.removeFromLeft (colWidth), attackNameLabel, attackSlider, attackValueLabel);
+    layoutColumn (advancedArea.removeFromLeft (colWidth), harmonicNameLabel, harmonicSlider, harmonicValueLabel);
+    layoutColumn (advancedArea, sustainNameLabel, sustainSlider, sustainValueLabel);
+
+    area.removeFromTop (14);
+
+    // Bottom section: Monitor box | Mix knob | In/Out box.
+    auto bottomArea = area.removeFromTop (110);
+    auto monitorArea = bottomArea.removeFromLeft (bottomArea.getWidth() * 38 / 100);
+    auto meterArea = bottomArea.removeFromRight (bottomArea.getWidth() * 55 / 100);
+    auto mixArea = bottomArea;
+
+    auto monitorInner = monitorArea.reduced (10);
+    monitorLabel.setBounds (monitorInner.removeFromTop (16));
+    monitorInner.removeFromTop (4);
+    auto modeRow = monitorInner.removeFromTop ((monitorInner.getHeight() - 4) / 2);
+    auto modeWidth = modeRow.getWidth() / 2;
+    normalButton.setBounds (modeRow.removeFromLeft (modeWidth).reduced (3));
+    deltaButton.setBounds  (modeRow.reduced (3));
+    monitorInner.removeFromTop (4);
+    auto overrideRow = monitorInner;
+    auto overrideWidth = overrideRow.getWidth() / 2;
+    bypassButton.setBounds (overrideRow.removeFromLeft (overrideWidth).reduced (3));
+    abButton.setBounds     (overrideRow.reduced (3));
+
+    wetDryLabel.setBounds (mixArea.removeFromTop (16));
+    wetDrySlider.setBounds (mixArea.withSizeKeepingCentre (76, 76));
+
+    auto meterInner = meterArea.reduced (10);
+    metersLabel.setBounds (meterInner.removeFromTop (16));
+    meterInner.removeFromTop (4);
+    meterScaleBounds = meterInner.removeFromLeft (22);
+    meterInner.removeFromLeft (4);
+    inputMeter.setBounds  (meterInner.removeFromLeft (meterInner.getWidth() / 2).reduced (5, 0));
+    outputMeter.setBounds (meterInner.reduced (5, 0));
+
+}
