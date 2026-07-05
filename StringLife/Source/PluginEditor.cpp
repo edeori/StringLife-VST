@@ -7,6 +7,12 @@ namespace
 {
     constexpr float panelCornerSize = 10.0f;
 
+    // Reference window size the design-space pixel values in resized() are
+    // measured at - the window is resizable with this aspect ratio locked,
+    // and every position, size and font scales uniformly from here.
+    constexpr int designWidth  = 560;
+    constexpr int designHeight = 500;
+
     // The Monitor and In/Out boxes are recessed rounded rects baked directly
     // into the background panel artwork, not something we draw ourselves -
     // these fractions are the pixel bounds of those two boxes measured
@@ -113,13 +119,13 @@ StringLifeAudioProcessorEditor::StringLifeAudioProcessorEditor (StringLifeAudioP
     backgroundImage = juce::ImageFileFormat::loadFrom (BinaryData::background_panel_png, (size_t) BinaryData::background_panel_pngSize);
     logoImage       = juce::ImageFileFormat::loadFrom (BinaryData::moth_logo_png, (size_t) BinaryData::moth_logo_pngSize);
 
+    // Fonts for all labels are set (and re-set on every resize) by
+    // updateFonts(), so they scale together with the layout.
     manufacturerLabel.setText (withLetterSpacing ("MOTH PRODUCTION"), juce::dontSendNotification);
-    manufacturerLabel.setFont (StringLifeFonts::uiLight (10.0f));
     manufacturerLabel.setColour (juce::Label::textColourId, juce::Colours::grey);
     addAndMakeVisible (manufacturerLabel);
 
     titleLabel.setText ("StringLife", juce::dontSendNotification);
-    titleLabel.setFont (StringLifeFonts::title (28.0f));
     titleLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.95f));
     addAndMakeVisible (titleLabel);
 
@@ -137,7 +143,6 @@ StringLifeAudioProcessorEditor::StringLifeAudioProcessorEditor (StringLifeAudioP
     freshLabel.setJustificationType (juce::Justification::centredRight);
     for (auto* l : { &deadLabel, &freshLabel })
     {
-        l->setFont (StringLifeFonts::uiMedium (13.0f));
         l->setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.7f));
         addAndMakeVisible (l);
     }
@@ -148,7 +153,6 @@ StringLifeAudioProcessorEditor::StringLifeAudioProcessorEditor (StringLifeAudioP
     stringAgeAttachment = std::make_unique<SliderAttachment> (apvts, ParamIDs::stringAge, stringAgeSlider);
 
     stringAgeValueLabel.setJustificationType (juce::Justification::centred);
-    stringAgeValueLabel.setFont (StringLifeFonts::numeric (16.0f));
     stringAgeValueLabel.setColour (juce::Label::textColourId, StringLifeLookAndFeel::getAccentColour());
     addAndMakeVisible (stringAgeValueLabel);
 
@@ -161,12 +165,10 @@ StringLifeAudioProcessorEditor::StringLifeAudioProcessorEditor (StringLifeAudioP
 
         nameLabel.setText (withLetterSpacing (name), juce::dontSendNotification);
         nameLabel.setJustificationType (juce::Justification::centred);
-        nameLabel.setFont (StringLifeFonts::uiMedium (12.0f));
         nameLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.7f));
         addAndMakeVisible (nameLabel);
 
         valueLabel.setJustificationType (juce::Justification::centred);
-        valueLabel.setFont (StringLifeFonts::numeric (13.0f));
         valueLabel.setColour (juce::Label::textColourId, StringLifeLookAndFeel::getAccentColour());
         addAndMakeVisible (valueLabel);
     };
@@ -183,7 +185,6 @@ StringLifeAudioProcessorEditor::StringLifeAudioProcessorEditor (StringLifeAudioP
 
     monitorLabel.setText (withLetterSpacing ("MONITOR"), juce::dontSendNotification);
     monitorLabel.setJustificationType (juce::Justification::centred);
-    monitorLabel.setFont (StringLifeFonts::uiMedium (10.5f));
     monitorLabel.setColour (juce::Label::textColourId, juce::Colours::grey);
     addAndMakeVisible (monitorLabel);
 
@@ -210,13 +211,11 @@ StringLifeAudioProcessorEditor::StringLifeAudioProcessorEditor (StringLifeAudioP
 
     wetDryLabel.setText (withLetterSpacing ("MIX"), juce::dontSendNotification);
     wetDryLabel.setJustificationType (juce::Justification::centred);
-    wetDryLabel.setFont (StringLifeFonts::uiMedium (10.5f));
     wetDryLabel.setColour (juce::Label::textColourId, juce::Colours::grey);
     addAndMakeVisible (wetDryLabel);
 
     metersLabel.setText (withLetterSpacing ("IN / OUT"), juce::dontSendNotification);
     metersLabel.setJustificationType (juce::Justification::centred);
-    metersLabel.setFont (StringLifeFonts::uiMedium (10.5f));
     metersLabel.setColour (juce::Label::textColourId, juce::Colours::grey);
     addAndMakeVisible (metersLabel);
 
@@ -224,7 +223,6 @@ StringLifeAudioProcessorEditor::StringLifeAudioProcessorEditor (StringLifeAudioP
     addAndMakeVisible (outputMeter);
 
     versionLabel.setText ("v" + juce::String (JucePlugin_VersionString), juce::dontSendNotification);
-    versionLabel.setFont (StringLifeFonts::uiLight (9.0f));
     versionLabel.setColour (juce::Label::textColourId, juce::Colours::grey.withAlpha (0.6f));
     versionLabel.setJustificationType (juce::Justification::centredRight);
     addAndMakeVisible (versionLabel);
@@ -233,7 +231,13 @@ StringLifeAudioProcessorEditor::StringLifeAudioProcessorEditor (StringLifeAudioP
     updateMonitorButtons();
     updateCompareButtonLabel();
 
-    setSize (560, 500);
+    // Resizable with the design aspect ratio locked - resized() scales the
+    // whole layout (positions, sizes, fonts) uniformly from the reference
+    // design size, so nothing drifts off the background artwork.
+    setResizable (true, true);
+    setResizeLimits (designWidth * 4 / 5, designHeight * 4 / 5, designWidth * 2, designHeight * 2);
+    getConstrainer()->setFixedAspectRatio ((double) designWidth / (double) designHeight);
+    setSize (designWidth, designHeight);
     startTimerHz (30);
 }
 
@@ -247,6 +251,27 @@ void StringLifeAudioProcessorEditor::setChoiceParam (const juce::String& paramID
 {
     if (auto* param = apvts.getParameter (paramID))
         param->setValueNotifyingHost (param->convertTo0to1 ((float) choiceIndex));
+}
+
+void StringLifeAudioProcessorEditor::updateFonts (float scale)
+{
+    manufacturerLabel.setFont (StringLifeFonts::uiLight (10.0f * scale));
+    titleLabel.setFont (StringLifeFonts::title (28.0f * scale));
+    versionLabel.setFont (StringLifeFonts::uiLight (9.0f * scale));
+
+    for (auto* l : { &deadLabel, &freshLabel })
+        l->setFont (StringLifeFonts::uiMedium (13.0f * scale));
+
+    stringAgeValueLabel.setFont (StringLifeFonts::numeric (16.0f * scale));
+
+    for (auto* l : { &presenceNameLabel, &attackNameLabel, &harmonicNameLabel, &sustainNameLabel })
+        l->setFont (StringLifeFonts::uiMedium (12.0f * scale));
+
+    for (auto* l : { &presenceValueLabel, &attackValueLabel, &harmonicValueLabel, &sustainValueLabel })
+        l->setFont (StringLifeFonts::numeric (13.0f * scale));
+
+    for (auto* l : { &monitorLabel, &wetDryLabel, &metersLabel })
+        l->setFont (StringLifeFonts::uiMedium (10.5f * scale));
 }
 
 void StringLifeAudioProcessorEditor::updateInstrumentButtons()
@@ -362,19 +387,22 @@ void StringLifeAudioProcessorEditor::drawMeterScale (juce::Graphics& g)
 {
     static const std::array<int, 7> dbMarks { 0, -6, -12, -18, -24, -36, -60 };
 
+    auto uiScale = (float) getWidth() / (float) designWidth;
+
     g.setColour (juce::Colours::grey.withAlpha (0.6f));
-    g.setFont (juce::Font (juce::FontOptions (7.0f)));
+    g.setFont (juce::Font (juce::FontOptions (7.0f * uiScale)));
 
     auto top = (float) meterScaleBounds.getY();
     auto bottom = (float) meterScaleBounds.getBottom();
+    auto rowHeight = juce::roundToInt (10.0f * uiScale);
 
-    // The gap between the slots is ~14px wide, so a small font and no
-    // ellipsis - otherwise "-60" renders as "…".
+    // The gap between the slots is only ~14px wide (at design size), so a
+    // small font and no ellipsis - otherwise "-60" renders as "…".
     for (auto db : dbMarks)
     {
         auto frac = (float) (db + 60) / 60.0f;
         auto y = bottom - frac * (bottom - top);
-        g.drawText (juce::String (db), meterScaleBounds.getX(), (int) y - 5, meterScaleBounds.getWidth(), 10,
+        g.drawText (juce::String (db), meterScaleBounds.getX(), (int) y - rowHeight / 2, meterScaleBounds.getWidth(), rowHeight,
                     juce::Justification::centred, false);
     }
 }
@@ -393,22 +421,29 @@ void StringLifeAudioProcessorEditor::resized()
 {
     auto bounds = getLocalBounds();
 
-    // Map coordinates measured on the 1448x1086 background artwork into
-    // window space, so every section anchors to the printed panel features
-    // (topmost strip, its divider line, and the big recessed content box)
-    // instead of flowing from whatever the section above happened to use.
+    // Everything scales with the window. Background-artwork coordinates
+    // (measured on the 1448x1086 source image) map through bgX/bgY as
+    // fractions of the current size; design-space paddings and component
+    // sizes (laid out for the 560x500 reference window) scale through
+    // px(). The aspect ratio is locked by the constrainer, so the two stay
+    // in sync and nothing drifts off the printed panel features when the
+    // window is resized.
+    auto scale = (float) bounds.getWidth() / (float) designWidth;
+    auto px  = [&] (float designPx) { return juce::roundToInt (designPx * scale); };
     auto bgX = [&] (float srcX) { return juce::roundToInt (srcX / 1448.0f * (float) bounds.getWidth()); };
     auto bgY = [&] (float srcY) { return juce::roundToInt (srcY / 1086.0f * (float) bounds.getHeight()); };
+
+    updateFonts (scale);
 
     // Topmost strip (between the bezel and the printed divider line):
     // manufacturer name left, logo centered, version right.
     juce::Rectangle<int> topStrip (bgX (64.0f), bgY (22.0f),
                                    bgX (1380.0f) - bgX (64.0f), bgY (100.0f) - bgY (22.0f));
-    manufacturerLabel.setBounds (topStrip.withTrimmedLeft (16).removeFromLeft (180));
-    versionLabel.setBounds (topStrip.withTrimmedRight (16).removeFromRight (60));
+    manufacturerLabel.setBounds (topStrip.withTrimmedLeft (px (16)).removeFromLeft (px (180)));
+    versionLabel.setBounds (topStrip.withTrimmedRight (px (16)).removeFromRight (px (60)));
 
     constexpr float logoAspect = 592.0f / 380.0f;   // moth_logo.png source proportions
-    constexpr float logoHeight = 26.0f;
+    auto logoHeight = 26.0f * scale;
     logoBounds = juce::Rectangle<float> (logoHeight * logoAspect, logoHeight)
                      .withCentre (topStrip.toFloat().getCentre());
 
@@ -416,11 +451,11 @@ void StringLifeAudioProcessorEditor::resized()
     // title on the left, instrument toggle centered.
     juce::Rectangle<int> headerBand (bgX (64.0f), bgY (100.0f),
                                      bgX (1380.0f) - bgX (64.0f), bgY (263.0f) - bgY (100.0f));
-    titleLabel.setBounds (headerBand.withTrimmedLeft (16).removeFromLeft (160));
+    titleLabel.setBounds (headerBand.withTrimmedLeft (px (16)).removeFromLeft (px (160)));
 
-    auto instrumentArea = juce::Rectangle<int> (146, 32).withCentre (headerBand.getCentre());
-    guitarButton.setBounds (instrumentArea.removeFromLeft (70));
-    instrumentArea.removeFromLeft (6);
+    auto instrumentArea = juce::Rectangle<int> (px (146), px (32)).withCentre (headerBand.getCentre());
+    guitarButton.setBounds (instrumentArea.removeFromLeft (px (70)));
+    instrumentArea.removeFromLeft (px (6));
     bassButton.setBounds (instrumentArea);
 
     // Big content box: string-age slider row tucked into its top, advanced
@@ -428,22 +463,22 @@ void StringLifeAudioProcessorEditor::resized()
     juce::Rectangle<int> contentBox (bgX (64.0f), bgY (263.0f),
                                      bgX (1380.0f) - bgX (64.0f), bgY (975.0f) - bgY (263.0f));
 
-    auto sliderRow = contentBox.withTrimmedTop (12).removeFromTop (30).reduced (20, 0);
-    deadLabel.setBounds (sliderRow.removeFromLeft (50));
-    freshLabel.setBounds (sliderRow.removeFromRight (50));
-    stringAgeSlider.setBounds (sliderRow.reduced (6, 0));
-    stringAgeValueLabel.setBounds (contentBox.getX(), contentBox.getY() + 46, contentBox.getWidth(), 18);
+    auto sliderRow = contentBox.withTrimmedTop (px (12)).removeFromTop (px (30)).reduced (px (20), 0);
+    deadLabel.setBounds (sliderRow.removeFromLeft (px (50)));
+    freshLabel.setBounds (sliderRow.removeFromRight (px (50)));
+    stringAgeSlider.setBounds (sliderRow.reduced (px (6), 0));
+    stringAgeValueLabel.setBounds (contentBox.getX(), contentBox.getY() + px (46), contentBox.getWidth(), px (18));
 
     // Advanced parameter row (Spark | Bite | Shimmer | Bloom).
-    auto advancedArea = juce::Rectangle<int> (contentBox.getX() + 6, contentBox.getY() + 68,
-                                              contentBox.getWidth() - 12, 112);
+    auto advancedArea = juce::Rectangle<int> (contentBox.getX() + px (6), contentBox.getY() + px (68),
+                                              contentBox.getWidth() - px (12), px (112));
     auto colWidth = advancedArea.getWidth() / 4;
 
-    auto layoutColumn = [] (juce::Rectangle<int> col, juce::Label& name, juce::Slider& slider, juce::Label& value)
+    auto layoutColumn = [&] (juce::Rectangle<int> col, juce::Label& name, juce::Slider& slider, juce::Label& value)
     {
-        name.setBounds (col.removeFromTop (16));
-        value.setBounds (col.removeFromBottom (16));
-        slider.setBounds (col.reduced (8, 0));
+        name.setBounds (col.removeFromTop (px (16)));
+        value.setBounds (col.removeFromBottom (px (16)));
+        slider.setBounds (col.reduced (px (8), 0));
     };
 
     layoutColumn (advancedArea.removeFromLeft (colWidth), presenceNameLabel, presenceSlider, presenceValueLabel);
@@ -456,59 +491,58 @@ void StringLifeAudioProcessorEditor::resized()
     // above) rather than flowing from the cumulative layout above, so these
     // components land exactly inside the printed frame regardless of how
     // much vertical space the sections above happened to consume.
-    auto fullBounds = getLocalBounds();
-    auto boxTop    = juce::roundToInt (bottomBoxTopFrac    * (float) fullBounds.getHeight());
-    auto boxBottom = juce::roundToInt (bottomBoxBottomFrac * (float) fullBounds.getHeight());
+    auto boxTop    = juce::roundToInt (bottomBoxTopFrac    * (float) bounds.getHeight());
+    auto boxBottom = juce::roundToInt (bottomBoxBottomFrac * (float) bounds.getHeight());
 
     auto monitorArea = juce::Rectangle<int> (
-        juce::roundToInt (monitorBoxLeftFrac * (float) fullBounds.getWidth()), boxTop,
-        juce::roundToInt ((monitorBoxRightFrac - monitorBoxLeftFrac) * (float) fullBounds.getWidth()),
+        juce::roundToInt (monitorBoxLeftFrac * (float) bounds.getWidth()), boxTop,
+        juce::roundToInt ((monitorBoxRightFrac - monitorBoxLeftFrac) * (float) bounds.getWidth()),
         boxBottom - boxTop);
 
     auto meterArea = juce::Rectangle<int> (
-        juce::roundToInt (meterBoxLeftFrac * (float) fullBounds.getWidth()), boxTop,
-        juce::roundToInt ((meterBoxRightFrac - meterBoxLeftFrac) * (float) fullBounds.getWidth()),
+        juce::roundToInt (meterBoxLeftFrac * (float) bounds.getWidth()), boxTop,
+        juce::roundToInt ((meterBoxRightFrac - meterBoxLeftFrac) * (float) bounds.getWidth()),
         boxBottom - boxTop);
 
     auto mixArea = juce::Rectangle<int> (monitorArea.getRight(), boxTop,
                                           meterArea.getX() - monitorArea.getRight(), boxBottom - boxTop);
 
-    auto monitorInner = monitorArea.reduced (10);
-    monitorLabel.setBounds (monitorInner.removeFromTop (16));
-    monitorInner.removeFromTop (4);
-    auto modeRow = monitorInner.removeFromTop ((monitorInner.getHeight() - 4) / 2);
+    auto monitorInner = monitorArea.reduced (px (10));
+    monitorLabel.setBounds (monitorInner.removeFromTop (px (16)));
+    monitorInner.removeFromTop (px (4));
+    auto modeRow = monitorInner.removeFromTop ((monitorInner.getHeight() - px (4)) / 2);
     auto modeWidth = modeRow.getWidth() / 2;
-    normalButton.setBounds (modeRow.removeFromLeft (modeWidth).reduced (3));
-    deltaButton.setBounds  (modeRow.reduced (3));
-    monitorInner.removeFromTop (4);
+    normalButton.setBounds (modeRow.removeFromLeft (modeWidth).reduced (px (3)));
+    deltaButton.setBounds  (modeRow.reduced (px (3)));
+    monitorInner.removeFromTop (px (4));
     auto overrideRow = monitorInner;
     auto overrideWidth = overrideRow.getWidth() / 2;
-    bypassButton.setBounds (overrideRow.removeFromLeft (overrideWidth).reduced (3));
-    abButton.setBounds     (overrideRow.reduced (3));
+    bypassButton.setBounds (overrideRow.removeFromLeft (overrideWidth).reduced (px (3)));
+    abButton.setBounds     (overrideRow.reduced (px (3)));
 
-    wetDryLabel.setBounds (mixArea.removeFromTop (16));
-    wetDrySlider.setBounds (mixArea.withSizeKeepingCentre (76, 76));
+    wetDryLabel.setBounds (mixArea.removeFromTop (px (16)));
+    wetDrySlider.setBounds (mixArea.withSizeKeepingCentre (px (76), px (76)));
 
     // Unlike the Monitor box, the In/Out box has its own baked-in header
     // strip plus two individual meter slot cutouts (with a wider margin
     // after the second slot than before the first) - anchor each piece to
     // its own measured rect rather than splitting meterArea evenly, so the
     // meters land inside their printed slots instead of overflowing them.
-    auto meterHeaderBottom = juce::roundToInt (meterHeaderBottomFrac * (float) fullBounds.getHeight());
+    auto meterHeaderBottom = juce::roundToInt (meterHeaderBottomFrac * (float) bounds.getHeight());
     metersLabel.setBounds (juce::Rectangle<int> (meterArea.getX(), boxTop, meterArea.getWidth(), meterHeaderBottom - boxTop));
 
     auto slot1 = juce::Rectangle<int> (
-        juce::roundToInt (meterSlot1LeftFrac * (float) fullBounds.getWidth()), meterHeaderBottom,
-        juce::roundToInt ((meterSlot1RightFrac - meterSlot1LeftFrac) * (float) fullBounds.getWidth()),
+        juce::roundToInt (meterSlot1LeftFrac * (float) bounds.getWidth()), meterHeaderBottom,
+        juce::roundToInt ((meterSlot1RightFrac - meterSlot1LeftFrac) * (float) bounds.getWidth()),
         boxBottom - meterHeaderBottom);
 
     auto slot2 = juce::Rectangle<int> (
-        juce::roundToInt (meterSlot2LeftFrac * (float) fullBounds.getWidth()), meterHeaderBottom,
-        juce::roundToInt ((meterSlot2RightFrac - meterSlot2LeftFrac) * (float) fullBounds.getWidth()),
+        juce::roundToInt (meterSlot2LeftFrac * (float) bounds.getWidth()), meterHeaderBottom,
+        juce::roundToInt ((meterSlot2RightFrac - meterSlot2LeftFrac) * (float) bounds.getWidth()),
         boxBottom - meterHeaderBottom);
 
-    inputMeter.setBounds  (slot1.reduced (4));
-    outputMeter.setBounds (slot2.reduced (4));
+    inputMeter.setBounds  (slot1.reduced (px (4)));
+    outputMeter.setBounds (slot2.reduced (px (4)));
 
     // The dB scale goes in the printed gap BETWEEN the two slots - the
     // margins outside the slots are only ~10px wide, which clips "-12" and

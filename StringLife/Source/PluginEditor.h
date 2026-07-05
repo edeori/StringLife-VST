@@ -44,6 +44,7 @@ private:
     void timerCallback() override;
 
     void setChoiceParam (const juce::String& paramID, int choiceIndex);
+    void updateFonts (float scale);
     void updateInstrumentButtons();
     void updateMonitorButtons();
     void updateCompareButtonLabel();

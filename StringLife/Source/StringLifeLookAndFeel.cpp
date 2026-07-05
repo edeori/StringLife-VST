@@ -272,5 +272,7 @@ void StringLifeLookAndFeel::drawButtonText (juce::Graphics& g, juce::TextButton&
 
 juce::Font StringLifeLookAndFeel::getTextButtonFont (juce::TextButton&, int buttonHeight)
 {
-    return StringLifeFonts::uiMedium (juce::jmin (15.0f, (float) buttonHeight * 0.5f));
+    // Purely height-relative (no absolute cap), so button text scales
+    // together with the resizable UI.
+    return StringLifeFonts::uiMedium ((float) buttonHeight * 0.47f);
 }
