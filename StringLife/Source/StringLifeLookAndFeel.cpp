@@ -150,19 +150,15 @@ void StringLifeLookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, i
 
     if (sliderThumbImage.isValid())
     {
-        // The source crop isn't perfectly transparent right at its edges
-        // (the glow fades out gradually), so clip to a circle - otherwise
-        // a faint square shows up around the thumb against the dark panel.
-        auto imageBounds = thumbBounds.expanded (thumbRadius * 0.5f);
+        // The source render is a tight circular crop with a real alpha
+        // channel, so it can be drawn directly - just slightly larger than
+        // the nominal thumb size so the knob reads as sitting ON the track
+        // rather than inside it.
+        auto imageBounds = thumbBounds.expanded (thumbRadius * 0.12f);
 
-        g.saveState();
-        juce::Path circleClip;
-        circleClip.addEllipse (imageBounds.reduced (imageBounds.getWidth() * 0.08f));
-        g.reduceClipRegion (circleClip);
         g.setOpacity (enabled ? 1.0f : 0.6f);
         g.drawImage (sliderThumbImage, imageBounds);
         g.setOpacity (1.0f);
-        g.restoreState();
     }
     else
     {

@@ -6,7 +6,30 @@
 namespace
 {
     constexpr float panelCornerSize = 10.0f;
-    constexpr float panelInset = 18.0f;
+
+    // The Monitor and In/Out boxes are recessed rounded rects baked directly
+    // into the background panel artwork, not something we draw ourselves -
+    // these fractions are the pixel bounds of those two boxes measured
+    // directly from Assets/background_panel.png (a 1448x1086 source image),
+    // so the real components we lay on top can be positioned to land
+    // exactly inside the printed frame instead of drifting off it.
+    constexpr float bottomBoxTopFrac      = 667.0f  / 1086.0f;
+    constexpr float bottomBoxBottomFrac   = 928.0f  / 1086.0f;
+    constexpr float monitorBoxLeftFrac    = 120.0f  / 1448.0f;
+    constexpr float monitorBoxRightFrac   = 591.0f  / 1448.0f;
+    constexpr float meterBoxLeftFrac      = 1038.0f / 1448.0f;
+    constexpr float meterBoxRightFrac     = 1325.0f / 1448.0f;
+
+    // The In/Out box also has its own baked-in header strip and two vertical
+    // meter slots (with a gap between them, and a wider margin after the
+    // second slot) - measured the same way as the outer boxes above, so the
+    // meter components sit exactly inside their printed cutouts instead of
+    // overflowing past them.
+    constexpr float meterHeaderBottomFrac = 723.0f  / 1086.0f;
+    constexpr float meterSlot1LeftFrac    = 1065.0f / 1448.0f;
+    constexpr float meterSlot1RightFrac   = 1165.0f / 1448.0f;
+    constexpr float meterSlot2LeftFrac    = 1199.0f / 1448.0f;
+    constexpr float meterSlot2RightFrac   = 1298.0f / 1448.0f;
 }
 
 //==============================================================================
@@ -96,14 +119,9 @@ StringLifeAudioProcessorEditor::StringLifeAudioProcessorEditor (StringLifeAudioP
     addAndMakeVisible (manufacturerLabel);
 
     titleLabel.setText ("StringLife", juce::dontSendNotification);
-    titleLabel.setFont (StringLifeFonts::title (32.0f));
+    titleLabel.setFont (StringLifeFonts::title (28.0f));
     titleLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.95f));
     addAndMakeVisible (titleLabel);
-
-    subtitleLabel.setText (withLetterSpacing ("STRING RESTORATION TOOL"), juce::dontSendNotification);
-    subtitleLabel.setFont (StringLifeFonts::uiLight (10.5f));
-    subtitleLabel.setColour (juce::Label::textColourId, StringLifeLookAndFeel::getAccentColour().withAlpha (0.85f));
-    addAndMakeVisible (subtitleLabel);
 
     guitarButton.setClickingTogglesState (false);
     bassButton.setClickingTogglesState (false);
@@ -345,77 +363,80 @@ void StringLifeAudioProcessorEditor::drawMeterScale (juce::Graphics& g)
     static const std::array<int, 7> dbMarks { 0, -6, -12, -18, -24, -36, -60 };
 
     g.setColour (juce::Colours::grey.withAlpha (0.6f));
-    g.setFont (juce::Font (juce::FontOptions (8.0f)));
+    g.setFont (juce::Font (juce::FontOptions (7.0f)));
 
     auto top = (float) meterScaleBounds.getY();
     auto bottom = (float) meterScaleBounds.getBottom();
 
+    // The gap between the slots is ~14px wide, so a small font and no
+    // ellipsis - otherwise "-60" renders as "…".
     for (auto db : dbMarks)
     {
         auto frac = (float) (db + 60) / 60.0f;
         auto y = bottom - frac * (bottom - top);
-        g.drawText (juce::String (db), meterScaleBounds.getX(), (int) y - 6, meterScaleBounds.getWidth(), 12,
-                    juce::Justification::centredRight);
+        g.drawText (juce::String (db), meterScaleBounds.getX(), (int) y - 5, meterScaleBounds.getWidth(), 10,
+                    juce::Justification::centred, false);
     }
 }
 
 void StringLifeAudioProcessorEditor::paint (juce::Graphics& g)
 {
+    // Everything visible is either the background artwork itself (with its
+    // own printed divider line and recessed boxes) or a real component laid
+    // on top - no extra drawn dividers or panels.
     drawPanelFrame (g);
-
-    g.setColour (juce::Colours::white.withAlpha (0.08f));
-    g.drawLine (panelInset, (float) dividerY1, (float) getWidth() - panelInset, (float) dividerY1, 1.0f);
-    g.drawLine (panelInset, (float) dividerY2, (float) getWidth() - panelInset, (float) dividerY2, 1.0f);
-
-    // No boxed panel behind Monitor/In-Out any more - buttons, knobs and
-    // meters just sit directly on the plain background panel texture.
     drawMeterScale (g);
     drawLogo (g, logoBounds);
 }
 
 void StringLifeAudioProcessorEditor::resized()
 {
-    auto area = getLocalBounds().reduced ((int) panelInset + 4);
+    auto bounds = getLocalBounds();
 
-    // Header: manufacturer line, then title/subtitle with instrument toggle
-    // to the right.
-    auto manufacturerRow = area.removeFromTop (16);
-    logoBounds = manufacturerRow.removeFromLeft (14).toFloat();
-    manufacturerRow.removeFromLeft (4);
-    versionLabel.setBounds (manufacturerRow.removeFromRight (60));
-    manufacturerLabel.setBounds (manufacturerRow);
+    // Map coordinates measured on the 1448x1086 background artwork into
+    // window space, so every section anchors to the printed panel features
+    // (topmost strip, its divider line, and the big recessed content box)
+    // instead of flowing from whatever the section above happened to use.
+    auto bgX = [&] (float srcX) { return juce::roundToInt (srcX / 1448.0f * (float) bounds.getWidth()); };
+    auto bgY = [&] (float srcY) { return juce::roundToInt (srcY / 1086.0f * (float) bounds.getHeight()); };
 
-    area.removeFromTop (2);
+    // Topmost strip (between the bezel and the printed divider line):
+    // manufacturer name left, logo centered, version right.
+    juce::Rectangle<int> topStrip (bgX (64.0f), bgY (22.0f),
+                                   bgX (1380.0f) - bgX (64.0f), bgY (100.0f) - bgY (22.0f));
+    manufacturerLabel.setBounds (topStrip.withTrimmedLeft (16).removeFromLeft (180));
+    versionLabel.setBounds (topStrip.withTrimmedRight (16).removeFromRight (60));
 
-    auto titleRow = area.removeFromTop (48);
-    auto instrumentArea = titleRow.removeFromRight (150);
-    instrumentArea = instrumentArea.withSizeKeepingCentre (instrumentArea.getWidth(), 32);
-    bassButton.setBounds (instrumentArea.removeFromRight (70));
-    instrumentArea.removeFromRight (6);
-    guitarButton.setBounds (instrumentArea.removeFromRight (70));
+    constexpr float logoAspect = 592.0f / 380.0f;   // moth_logo.png source proportions
+    constexpr float logoHeight = 26.0f;
+    logoBounds = juce::Rectangle<float> (logoHeight * logoAspect, logoHeight)
+                     .withCentre (topStrip.toFloat().getCentre());
 
-    titleLabel.setBounds (titleRow.removeFromTop (30));
-    subtitleLabel.setBounds (titleRow);
+    // Header band between the printed divider and the big content box:
+    // title on the left, instrument toggle centered.
+    juce::Rectangle<int> headerBand (bgX (64.0f), bgY (100.0f),
+                                     bgX (1380.0f) - bgX (64.0f), bgY (263.0f) - bgY (100.0f));
+    titleLabel.setBounds (headerBand.withTrimmedLeft (16).removeFromLeft (160));
 
-    area.removeFromTop (8);
-    dividerY1 = area.getY();
-    area.removeFromTop (10);
+    auto instrumentArea = juce::Rectangle<int> (146, 32).withCentre (headerBand.getCentre());
+    guitarButton.setBounds (instrumentArea.removeFromLeft (70));
+    instrumentArea.removeFromLeft (6);
+    bassButton.setBounds (instrumentArea);
 
-    // Main string age slider.
-    auto mainArea = area.removeFromTop (70);
-    auto sliderRow = mainArea.removeFromTop (30);
+    // Big content box: string-age slider row tucked into its top, advanced
+    // knob row below.
+    juce::Rectangle<int> contentBox (bgX (64.0f), bgY (263.0f),
+                                     bgX (1380.0f) - bgX (64.0f), bgY (975.0f) - bgY (263.0f));
+
+    auto sliderRow = contentBox.withTrimmedTop (12).removeFromTop (30).reduced (20, 0);
     deadLabel.setBounds (sliderRow.removeFromLeft (50));
     freshLabel.setBounds (sliderRow.removeFromRight (50));
     stringAgeSlider.setBounds (sliderRow.reduced (6, 0));
-    mainArea.removeFromTop (6);
-    stringAgeValueLabel.setBounds (mainArea.removeFromTop (20));
+    stringAgeValueLabel.setBounds (contentBox.getX(), contentBox.getY() + 46, contentBox.getWidth(), 18);
 
-    area.removeFromTop (8);
-    dividerY2 = area.getY();
-    area.removeFromTop (10);
-
-    // Advanced parameter row (Presence | Attack | Harmonic | Sustain).
-    auto advancedArea = area.removeFromTop (110);
+    // Advanced parameter row (Spark | Bite | Shimmer | Bloom).
+    auto advancedArea = juce::Rectangle<int> (contentBox.getX() + 6, contentBox.getY() + 68,
+                                              contentBox.getWidth() - 12, 112);
     auto colWidth = advancedArea.getWidth() / 4;
 
     auto layoutColumn = [] (juce::Rectangle<int> col, juce::Label& name, juce::Slider& slider, juce::Label& value)
@@ -430,13 +451,27 @@ void StringLifeAudioProcessorEditor::resized()
     layoutColumn (advancedArea.removeFromLeft (colWidth), harmonicNameLabel, harmonicSlider, harmonicValueLabel);
     layoutColumn (advancedArea, sustainNameLabel, sustainSlider, sustainValueLabel);
 
-    area.removeFromTop (14);
+    // Bottom section: Monitor box | Mix knob | In/Out box. Anchored to the
+    // background artwork's own baked-in box pixels (see the *Frac constants
+    // above) rather than flowing from the cumulative layout above, so these
+    // components land exactly inside the printed frame regardless of how
+    // much vertical space the sections above happened to consume.
+    auto fullBounds = getLocalBounds();
+    auto boxTop    = juce::roundToInt (bottomBoxTopFrac    * (float) fullBounds.getHeight());
+    auto boxBottom = juce::roundToInt (bottomBoxBottomFrac * (float) fullBounds.getHeight());
 
-    // Bottom section: Monitor box | Mix knob | In/Out box.
-    auto bottomArea = area.removeFromTop (110);
-    auto monitorArea = bottomArea.removeFromLeft (bottomArea.getWidth() * 38 / 100);
-    auto meterArea = bottomArea.removeFromRight (bottomArea.getWidth() * 55 / 100);
-    auto mixArea = bottomArea;
+    auto monitorArea = juce::Rectangle<int> (
+        juce::roundToInt (monitorBoxLeftFrac * (float) fullBounds.getWidth()), boxTop,
+        juce::roundToInt ((monitorBoxRightFrac - monitorBoxLeftFrac) * (float) fullBounds.getWidth()),
+        boxBottom - boxTop);
+
+    auto meterArea = juce::Rectangle<int> (
+        juce::roundToInt (meterBoxLeftFrac * (float) fullBounds.getWidth()), boxTop,
+        juce::roundToInt ((meterBoxRightFrac - meterBoxLeftFrac) * (float) fullBounds.getWidth()),
+        boxBottom - boxTop);
+
+    auto mixArea = juce::Rectangle<int> (monitorArea.getRight(), boxTop,
+                                          meterArea.getX() - monitorArea.getRight(), boxBottom - boxTop);
 
     auto monitorInner = monitorArea.reduced (10);
     monitorLabel.setBounds (monitorInner.removeFromTop (16));
@@ -454,12 +489,30 @@ void StringLifeAudioProcessorEditor::resized()
     wetDryLabel.setBounds (mixArea.removeFromTop (16));
     wetDrySlider.setBounds (mixArea.withSizeKeepingCentre (76, 76));
 
-    auto meterInner = meterArea.reduced (10);
-    metersLabel.setBounds (meterInner.removeFromTop (16));
-    meterInner.removeFromTop (4);
-    meterScaleBounds = meterInner.removeFromLeft (22);
-    meterInner.removeFromLeft (4);
-    inputMeter.setBounds  (meterInner.removeFromLeft (meterInner.getWidth() / 2).reduced (5, 0));
-    outputMeter.setBounds (meterInner.reduced (5, 0));
+    // Unlike the Monitor box, the In/Out box has its own baked-in header
+    // strip plus two individual meter slot cutouts (with a wider margin
+    // after the second slot than before the first) - anchor each piece to
+    // its own measured rect rather than splitting meterArea evenly, so the
+    // meters land inside their printed slots instead of overflowing them.
+    auto meterHeaderBottom = juce::roundToInt (meterHeaderBottomFrac * (float) fullBounds.getHeight());
+    metersLabel.setBounds (juce::Rectangle<int> (meterArea.getX(), boxTop, meterArea.getWidth(), meterHeaderBottom - boxTop));
 
+    auto slot1 = juce::Rectangle<int> (
+        juce::roundToInt (meterSlot1LeftFrac * (float) fullBounds.getWidth()), meterHeaderBottom,
+        juce::roundToInt ((meterSlot1RightFrac - meterSlot1LeftFrac) * (float) fullBounds.getWidth()),
+        boxBottom - meterHeaderBottom);
+
+    auto slot2 = juce::Rectangle<int> (
+        juce::roundToInt (meterSlot2LeftFrac * (float) fullBounds.getWidth()), meterHeaderBottom,
+        juce::roundToInt ((meterSlot2RightFrac - meterSlot2LeftFrac) * (float) fullBounds.getWidth()),
+        boxBottom - meterHeaderBottom);
+
+    inputMeter.setBounds  (slot1.reduced (4));
+    outputMeter.setBounds (slot2.reduced (4));
+
+    // The dB scale goes in the printed gap BETWEEN the two slots - the
+    // margins outside the slots are only ~10px wide, which clips "-12" and
+    // friends even at a tiny font size.
+    meterScaleBounds = juce::Rectangle<int> (slot1.getRight(), meterHeaderBottom,
+                                              slot2.getX() - slot1.getRight(), boxBottom - meterHeaderBottom);
 }

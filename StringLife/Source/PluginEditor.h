@@ -63,7 +63,6 @@ private:
 
     juce::Label manufacturerLabel;
     juce::Label titleLabel;
-    juce::Label subtitleLabel;
 
     juce::TextButton guitarButton { "GUITAR" };
     juce::TextButton bassButton   { "BASS" };
@@ -94,11 +93,10 @@ private:
 
     juce::Label versionLabel;
 
-    // Bounds cached by resized() so paint() can draw the dividers, logo and
-    // meter scale where the components laid out inside them actually are.
+    // Bounds cached by resized() so paint() can draw the logo and meter
+    // scale where the components laid out around them actually are.
     juce::Rectangle<int> meterScaleBounds;
     juce::Rectangle<float> logoBounds;
-    int dividerY1 = 0, dividerY2 = 0;
 
     using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
     using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
