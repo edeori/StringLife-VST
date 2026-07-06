@@ -107,6 +107,11 @@ private:
 
     juce::AudioBuffer<float> dryBuffer;
 
+    // Wet/dry crossfade gain (0-1), smoothed per-sample over ~30ms so fast
+    // MIX moves and automation don't zipper. The four DSP stages smooth
+    // their own amounts internally - see each stage's header.
+    juce::SmoothedValue<float> wetDrySmoothed { 1.0f };
+
     enum AdvancedParam { presence = 0, attack, harmonic, sustain, numAdvancedParams };
 
     // Each advanced parameter stays permanently linked to the stringAge macro

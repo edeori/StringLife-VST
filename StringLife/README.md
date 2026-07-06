@@ -46,6 +46,14 @@ On macOS the build targets `arm64;x86_64` with a deployment target of macOS
 Input -> Transient Enhancer -> Harmonic Exciter -> Presence EQ -> Upward Expander -> Wet/Dry mix -> Output
 ```
 
+All continuously variable amounts are smoothed (sample-rate aware, no
+allocation or locking on the audio thread), so host automation and fast knob
+moves - including DEAD↔FRESH macro sweeps, which fan out to the four advanced
+parameters - don't produce zipper noise: the three envelope/waveshaper stages
+smooth their amounts per-sample over ~20 ms, the wet/dry mix crossfades
+per-sample over ~30 ms, and the presence shelf ramps its gain over ~50 ms with
+allocation-free coefficient updates at block rate while the value is moving.
+
 ## UI Reference
 
 ### Top bar

@@ -11,6 +11,9 @@ void TransientEnhancer::prepare (double newSampleRate, int numChannels)
 
     attackCoeff  = std::exp (-1.0f / (float) (attackMs  * 0.001 * sampleRate));
     releaseCoeff = std::exp (-1.0f / (float) (releaseMs * 0.001 * sampleRate));
+
+    amountSmoothed.reset (sampleRate, 0.02);
+    amountSmoothed.setCurrentAndTargetValue (amountSmoothed.getTargetValue());
 }
 
 void TransientEnhancer::reset()
@@ -37,17 +40,24 @@ float TransientEnhancer::processSample (int channel, float x) noexcept
 
 void TransientEnhancer::process (juce::dsp::AudioBlock<float>& block) noexcept
 {
-    if (amount <= 0.0f)
+    // Early-out only once settled at zero - while still smoothing towards
+    // zero the fade itself has to be rendered.
+    if (! amountSmoothed.isSmoothing() && amountSmoothed.getTargetValue() <= 0.0f)
         return;
 
     auto numChannels = (int) block.getNumChannels();
     auto numSamples  = (int) block.getNumSamples();
 
-    for (int ch = 0; ch < numChannels; ++ch)
+    // Samples outer / channels inner, so every channel sees the same
+    // smoothed amount at a given sample index.
+    for (int i = 0; i < numSamples; ++i)
     {
-        auto* data = block.getChannelPointer ((size_t) ch);
+        amount = amountSmoothed.getNextValue();
 
-        for (int i = 0; i < numSamples; ++i)
+        for (int ch = 0; ch < numChannels; ++ch)
+        {
+            auto* data = block.getChannelPointer ((size_t) ch);
             data[i] = processSample (ch, data[i]);
+        }
     }
 }

@@ -202,6 +202,9 @@ void StringLifeAudioProcessor::prepareToPlay (double sampleRate, int samplesPerB
     presenceEQ.prepare (spec);
     upwardExpander.prepare (sampleRate, numChannels);
 
+    wetDrySmoothed.reset (sampleRate, 0.03);
+    wetDrySmoothed.setCurrentAndTargetValue (juce::jlimit (0.0f, 1.0f, wetDryParam->load() / 100.0f));
+
     dryBuffer.setSize (numChannels, samplesPerBlock);
 }
 
@@ -271,26 +274,40 @@ void StringLifeAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     // through the normal monitor mode below, just with different parameters.
     {
         auto monitor = (MonitorMode) juce::roundToInt (monitorParam->load());
-        auto mix = juce::jlimit (0.0f, 1.0f, wetDryParam->load() / 100.0f);
+        wetDrySmoothed.setTargetValue (juce::jlimit (0.0f, 1.0f, wetDryParam->load() / 100.0f));
 
-        for (int ch = 0; ch < numChannels; ++ch)
+        auto* const* wetPtrs = buffer.getArrayOfWritePointers();
+        auto* const* dryPtrs = dryBuffer.getArrayOfReadPointers();
+
+        switch (monitor)
         {
-            auto* wet = buffer.getWritePointer (ch);
-            auto* dry = dryBuffer.getReadPointer (ch);
+            case MonitorMode::normal:
+                // Samples outer / channels inner, so every channel sees the
+                // same smoothed mix gain at a given sample index.
+                for (int i = 0; i < numSamples; ++i)
+                {
+                    auto mix = wetDrySmoothed.getNextValue();
 
-            switch (monitor)
-            {
-                case MonitorMode::normal:
-                    for (int i = 0; i < numSamples; ++i)
-                        wet[i] = dry[i] * (1.0f - mix) + wet[i] * mix;
-                    break;
+                    for (int ch = 0; ch < numChannels; ++ch)
+                        wetPtrs[ch][i] = dryPtrs[ch][i] * (1.0f - mix) + wetPtrs[ch][i] * mix;
+                }
+                break;
 
-                case MonitorMode::delta:
-                    // +6dB makeup gain so subtle changes are audible.
+            case MonitorMode::delta:
+                // +6dB makeup gain so subtle changes are audible. The mix
+                // smoother still advances, so NORMAL resumes at the right
+                // value when switching back.
+                wetDrySmoothed.skip (numSamples);
+
+                for (int ch = 0; ch < numChannels; ++ch)
+                {
+                    auto* wet = wetPtrs[ch];
+                    auto* dry = dryPtrs[ch];
+
                     for (int i = 0; i < numSamples; ++i)
                         wet[i] = (wet[i] - dry[i]) * 2.0f;
-                    break;
-            }
+                }
+                break;
         }
     }
 

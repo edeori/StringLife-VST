@@ -15,7 +15,10 @@ public:
 
     void setBassMode (bool shouldUseBassRange) noexcept;
 
-    // amount corresponds to the presenceAmount parameter (0-1).
+    // amount corresponds to the presenceAmount parameter (0-1). The shelf
+    // gain follows it through a ~50ms smoother, with coefficients
+    // recomputed (allocation-free) once per block while the value is still
+    // moving - so automation ramps the gain instead of stepping it.
     void setAmount (float newAmount) noexcept;
 
     void process (juce::dsp::AudioBlock<float>& block);
@@ -30,6 +33,6 @@ private:
 
     double sampleRate = 44100.0;
     bool bassMode = false;
-    float amount = 0.5f;
+    juce::SmoothedValue<float> amountSmoothed { 0.5f };
     bool coefficientsDirty = true;
 };

@@ -15,8 +15,10 @@ public:
     void prepare (double sampleRate, int numChannels);
     void reset();
 
-    // amount corresponds to the harmonicExcite parameter (0-1).
-    void setAmount (float newAmount) noexcept { amount = newAmount; }
+    // amount corresponds to the harmonicExcite parameter (0-1). It reaches
+    // the DSP through a ~20ms smoother, so automation jumps and fast macro
+    // sweeps fade instead of zippering.
+    void setAmount (float newAmount) noexcept { amountSmoothed.setTargetValue (newAmount); }
 
     // Selects the high-pass cutoff used to isolate the harmonic-generating band:
     // guitar focuses on 2kHz-12kHz, bass on 800Hz-6kHz.
@@ -30,7 +32,8 @@ private:
 
     double sampleRate = 44100.0;
     bool bassMode = false;
-    float amount = 0.5f;
+    float amount = 0.5f;   // per-sample value, fed from amountSmoothed in process()
+    juce::SmoothedValue<float> amountSmoothed { 0.5f };
     float hpCoeff = 0.0f;
 
     std::vector<float> hpPrevInput;

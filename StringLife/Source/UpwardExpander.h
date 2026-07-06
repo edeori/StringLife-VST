@@ -15,8 +15,10 @@ public:
     void prepare (double sampleRate, int numChannels);
     void reset();
 
-    // amount corresponds to the sustainShape parameter (0-1).
-    void setAmount (float newAmount) noexcept { amount = newAmount; }
+    // amount corresponds to the sustainShape parameter (0-1). It reaches
+    // the DSP through a ~20ms smoother, so automation jumps and fast macro
+    // sweeps fade instead of zippering.
+    void setAmount (float newAmount) noexcept { amountSmoothed.setTargetValue (newAmount); }
 
     void process (juce::dsp::AudioBlock<float>& block) noexcept;
 
@@ -24,7 +26,8 @@ private:
     float processSample (int channel, float x) noexcept;
 
     double sampleRate = 44100.0;
-    float amount = 0.0f;
+    float amount = 0.0f;   // per-sample value, fed from amountSmoothed in process()
+    juce::SmoothedValue<float> amountSmoothed { 0.0f };
     float attackCoeff = 0.0f;
     float releaseCoeff = 0.0f;
 
