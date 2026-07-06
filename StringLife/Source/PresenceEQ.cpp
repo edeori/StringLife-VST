@@ -41,20 +41,18 @@ void PresenceEQ::updateCoefficients()
     auto gainDb = amountSmoothed.getCurrentValue() * maxGainDb;
     auto gainFactor = juce::Decibels::decibelsToGain (gainDb);
 
-    // ArrayCoefficients computes into a stack array, and the values are then
-    // copied into the filter's existing storage - no heap allocation, so
-    // this is safe to call from the audio thread every block while the
-    // smoothed gain is still moving. (The resize branch only ever runs on
-    // the first call, from prepare(), before playback starts.)
-    auto coeffs = juce::dsp::IIR::ArrayCoefficients<float>::makeHighShelf (sampleRate, freqHz, 0.707f, gainFactor);
-
-    auto& dest = filter.state->coefficients;
-
-    if (dest.size() != (int) coeffs.size())
-        dest.resize ((int) coeffs.size());
-
-    for (int i = 0; i < (int) coeffs.size(); ++i)
-        dest.setUnchecked (i, coeffs[(size_t) i]);
+    // ArrayCoefficients computes the raw {b0, b1, b2, a0, a1, a2} set into a
+    // stack array, and Coefficients::operator= (assignImpl) normalizes it by
+    // a0 into the filter's existing storage. That assign uses clearQuick(),
+    // which keeps the Array's capacity, so after the first call (from
+    // prepare(), on the message thread) this never allocates - safe to run
+    // per-block on the audio thread while the smoothed gain is moving.
+    //
+    // NB: do NOT copy the raw 6-value array into the storage by hand - the
+    // filter stores 5 a0-normalized values, and writing the raw layout in
+    // its place produces an unstable filter whose output explodes to Inf
+    // (a loud pop, then CoreAudio shuts the output device down).
+    *filter.state = juce::dsp::IIR::ArrayCoefficients<float>::makeHighShelf (sampleRate, freqHz, 0.707f, gainFactor);
 }
 
 void PresenceEQ::process (juce::dsp::AudioBlock<float>& block)
