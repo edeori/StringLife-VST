@@ -1,0 +1,11 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/mothproduction/Documents/VSCode/StringLife-VST/build/StringLife/cmake_install.cmake",
+		"/Users/mothproduction/Documents/VSCode/StringLife-VST/build/StringLife/_deps/juce-build/cmake_install.cmake",
+		"/Users/mothproduction/Documents/VSCode/StringLife-VST/build/StringLife/_deps/juce-build/modules/cmake_install.cmake",
+		"/Users/mothproduction/Documents/VSCode/StringLife-VST/build/StringLife/_deps/juce-build/extras/Build/cmake_install.cmake",
+		"/Users/mothproduction/Documents/VSCode/StringLife-VST/build/StringLife/_deps/juce-build/extras/Build/juceaide/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

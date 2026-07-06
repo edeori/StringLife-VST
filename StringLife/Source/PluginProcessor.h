@@ -10,6 +10,10 @@
 #include "PresenceEQ.h"
 #include "UpwardExpander.h"
 
+#if STRINGLIFE_ENABLE_LICENSING
+#include "Licensing/LicenseManager.h"
+#endif
+
 namespace ParamIDs
 {
     inline constexpr auto stringAge      = "stringAge";
@@ -64,6 +68,11 @@ public:
 
     float getInputLevelDb() const noexcept  { return inputLevelDb.load(); }
     float getOutputLevelDb() const noexcept { return outputLevelDb.load(); }
+
+#if STRINGLIFE_ENABLE_LICENSING
+    licensing::LicenseManager& getLicenseManager() noexcept { return licenseManager; }
+    const licensing::LicenseManager& getLicenseManager() const noexcept { return licenseManager; }
+#endif
 
     // Lets hosts show/automate our own bypass parameter instead of (or as
     // well as) their generic per-track bypass.
@@ -146,6 +155,10 @@ private:
 
     std::atomic<float> inputLevelDb  { -100.0f };
     std::atomic<float> outputLevelDb { -100.0f };
+
+#if STRINGLIFE_ENABLE_LICENSING
+    licensing::LicenseManager licenseManager;
+#endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (StringLifeAudioProcessor)
 };

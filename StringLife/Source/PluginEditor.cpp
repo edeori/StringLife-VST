@@ -1,6 +1,7 @@
 #include "PluginEditor.h"
 #include "StringLifeFonts.h"
 #include "BinaryData.h"
+#include <juce_gui_extra/juce_gui_extra.h>
 #include <array>
 
 namespace
@@ -37,6 +38,26 @@ namespace
     constexpr float meterSlot2LeftFrac    = 1199.0f / 1448.0f;
     constexpr float meterSlot2RightFrac   = 1298.0f / 1448.0f;
 }
+
+#if STRINGLIFE_ENABLE_LICENSING
+void LicenseOverlayComponent::paint (juce::Graphics& g)
+{
+    auto bounds = getLocalBounds().toFloat();
+    g.setColour (juce::Colour (0xff020304).withAlpha (0.96f));
+    g.fillRoundedRectangle (bounds, panelCornerSize);
+
+    auto popup = bounds.withSizeKeepingCentre (bounds.getWidth() * 0.55f, bounds.getHeight() * 0.34f);
+    g.setColour (juce::Colour (0xff090c10));
+    g.fillRoundedRectangle (popup, 14.0f);
+
+    auto shadow = popup.translated (0.0f, 4.0f);
+    g.setColour (juce::Colours::black.withAlpha (0.55f));
+    g.drawRoundedRectangle (shadow, 14.0f, 5.0f);
+
+    g.setColour (juce::Colours::white.withAlpha (0.26f));
+    g.drawRoundedRectangle (popup, 14.0f, 1.4f);
+}
+#endif
 
 //==============================================================================
 LevelMeter::LevelMeter (std::function<float()> levelDbProviderIn)
@@ -222,6 +243,34 @@ StringLifeAudioProcessorEditor::StringLifeAudioProcessorEditor (StringLifeAudioP
     addAndMakeVisible (inputMeter);
     addAndMakeVisible (outputMeter);
 
+#if STRINGLIFE_ENABLE_LICENSING
+    licenseOverlay.setInterceptsMouseClicks (true, true);
+    addAndMakeVisible (licenseOverlay);
+
+    licenseOverlayTitleLabel.setText ("Unlock StringLife", juce::dontSendNotification);
+    licenseOverlayTitleLabel.setJustificationType (juce::Justification::centred);
+    licenseOverlayTitleLabel.setColour (juce::Label::textColourId, juce::Colours::white);
+    licenseOverlay.addAndMakeVisible (licenseOverlayTitleLabel);
+
+    licenseOverlayStatusLabel.setJustificationType (juce::Justification::centred);
+    licenseOverlayStatusLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.96f));
+    licenseOverlay.addAndMakeVisible (licenseOverlayStatusLabel);
+
+    activateButton.onClick = [this]
+    {
+        showActivationDialog();
+    };
+    licenseOverlay.addAndMakeVisible (activateButton);
+
+    trialButton.onClick = [this]
+    {
+        licenseOverlayDismissed = true;
+        updateLicenseOverlayVisibility();
+        repaint();
+    };
+    licenseOverlay.addAndMakeVisible (trialButton);
+#endif
+
     versionLabel.setText ("v" + juce::String (JucePlugin_VersionString), juce::dontSendNotification);
     versionLabel.setColour (juce::Label::textColourId, juce::Colours::grey.withAlpha (0.6f));
     versionLabel.setJustificationType (juce::Justification::centredRight);
@@ -230,6 +279,10 @@ StringLifeAudioProcessorEditor::StringLifeAudioProcessorEditor (StringLifeAudioP
     updateInstrumentButtons();
     updateMonitorButtons();
     updateCompareButtonLabel();
+
+#if STRINGLIFE_ENABLE_LICENSING
+    updateLicenseUi();
+#endif
 
     // Resizable with the design aspect ratio locked - resized() scales the
     // whole layout (positions, sizes, fonts) uniformly from the reference
@@ -272,6 +325,11 @@ void StringLifeAudioProcessorEditor::updateFonts (float scale)
 
     for (auto* l : { &monitorLabel, &wetDryLabel, &metersLabel })
         l->setFont (StringLifeFonts::uiMedium (10.5f * scale));
+
+#if STRINGLIFE_ENABLE_LICENSING
+    licenseOverlayTitleLabel.setFont (StringLifeFonts::title (20.0f * scale));
+    licenseOverlayStatusLabel.setFont (StringLifeFonts::uiLight (11.0f * scale));
+#endif
 }
 
 void StringLifeAudioProcessorEditor::updateInstrumentButtons()
@@ -332,7 +390,92 @@ void StringLifeAudioProcessorEditor::timerCallback()
     updateInstrumentButtons();
     updateMonitorButtons();
     updateCompareButtonLabel();
+
+#if STRINGLIFE_ENABLE_LICENSING
+    updateLicenseUi();
+#endif
 }
+
+#if STRINGLIFE_ENABLE_LICENSING
+void StringLifeAudioProcessorEditor::updateLicenseUi()
+{
+    if (auto* processor = dynamic_cast<StringLifeAudioProcessor*> (getAudioProcessor()))
+    {
+        auto& manager = processor->getLicenseManager();
+        const auto status = manager.getStatus();
+
+        if (status == licensing::LicenseStatus::TrialActive)
+            licenseOverlayStatusLabel.setText (juce::String (manager.getDaysRemainingInTrial()) + " trial day(s) remaining",
+                                               juce::dontSendNotification);
+        else
+            licenseOverlayStatusLabel.setText (manager.getUserVisibleStatusMessage(), juce::dontSendNotification);
+
+        if (status == licensing::LicenseStatus::Activated || status == licensing::LicenseStatus::OfflineGracePeriod)
+            licenseOverlayDismissed = false;
+
+        updateLicenseOverlayVisibility();
+    }
+}
+
+void StringLifeAudioProcessorEditor::updateLicenseOverlayVisibility()
+{
+    auto visible = false;
+
+    if (auto* processor = dynamic_cast<StringLifeAudioProcessor*> (getAudioProcessor()))
+    {
+        const auto status = processor->getLicenseManager().getStatus();
+        visible = status != licensing::LicenseStatus::Activated
+               && status != licensing::LicenseStatus::OfflineGracePeriod
+               && ! licenseOverlayDismissed;
+    }
+
+    for (auto* component : { (juce::Component*) &licenseOverlayTitleLabel,
+                             (juce::Component*) &licenseOverlayStatusLabel,
+                             (juce::Component*) &activateButton,
+                             (juce::Component*) &trialButton })
+        component->setVisible (visible);
+
+    licenseOverlay.setVisible (visible);
+
+    if (visible)
+        licenseOverlay.toFront (false);
+}
+
+void StringLifeAudioProcessorEditor::showActivationDialog()
+{
+    auto* processor = dynamic_cast<StringLifeAudioProcessor*> (getAudioProcessor());
+
+    if (processor == nullptr)
+        return;
+
+    auto dialog = std::make_unique<juce::AlertWindow> ("Activate StringLife",
+                                                       "Enter your license key.",
+                                                       juce::AlertWindow::NoIcon);
+    dialog->addTextEditor ("licenseKey", {}, "License Key");
+    dialog->addButton ("Activate", 1, juce::KeyPress (juce::KeyPress::returnKey));
+    dialog->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+
+    dialog->enterModalState (true, juce::ModalCallbackFunction::create ([this, releasedDialog = dialog.release(), processor] (int result)
+    {
+        std::unique_ptr<juce::AlertWindow> ownedDialog (releasedDialog);
+
+        if (result != 1)
+            return;
+
+        const auto key = ownedDialog->getTextEditorContents ("licenseKey").trim();
+
+        if (key.isEmpty())
+            return;
+
+        processor->getLicenseManager().startActivation (key, [this] (const licensing::LicenseManager::OperationResult&)
+        {
+            licenseOverlayDismissed = false;
+            updateLicenseUi();
+            repaint();
+        });
+    }));
+}
+#endif
 
 void StringLifeAudioProcessorEditor::drawPanelFrame (juce::Graphics& g)
 {
@@ -549,4 +692,22 @@ void StringLifeAudioProcessorEditor::resized()
     // friends even at a tiny font size.
     meterScaleBounds = juce::Rectangle<int> (slot1.getRight(), meterHeaderBottom,
                                               slot2.getX() - slot1.getRight(), boxBottom - meterHeaderBottom);
+
+#if STRINGLIFE_ENABLE_LICENSING
+    licenseOverlay.setBounds (bounds);
+
+    auto overlayArea = bounds.reduced (px (110), px (160));
+    licenseOverlayTitleLabel.setBounds (overlayArea.getX() + px (16), overlayArea.getY() + px (18),
+                                        overlayArea.getWidth() - px (32), px (26));
+    licenseOverlayStatusLabel.setBounds (overlayArea.getX() + px (20), overlayArea.getY() + px (54),
+                                         overlayArea.getWidth() - px (40), px (34));
+
+    auto buttonRow = juce::Rectangle<int> (overlayArea.getX() + px (38), overlayArea.getBottom() - px (54),
+                                           overlayArea.getWidth() - px (76), px (28));
+    auto gap = px (10);
+    auto buttonWidth = (buttonRow.getWidth() - gap) / 2;
+    activateButton.setBounds (buttonRow.removeFromLeft (buttonWidth));
+    buttonRow.removeFromLeft (gap);
+    trialButton.setBounds (buttonRow.removeFromLeft (buttonWidth));
+#endif
 }

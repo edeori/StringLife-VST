@@ -30,6 +30,14 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (LevelMeter)
 };
 
+#if STRINGLIFE_ENABLE_LICENSING
+class LicenseOverlayComponent : public juce::Component
+{
+public:
+    void paint (juce::Graphics& g) override;
+};
+#endif
+
 class StringLifeAudioProcessorEditor  : public juce::AudioProcessorEditor,
                                          private juce::Timer
 {
@@ -49,6 +57,12 @@ private:
     void updateMonitorButtons();
     void updateCompareButtonLabel();
     void updateAdvancedLabel (juce::Label& valueLabel, juce::Slider& slider);
+
+#if STRINGLIFE_ENABLE_LICENSING
+    void updateLicenseUi();
+    void updateLicenseOverlayVisibility();
+    void showActivationDialog();
+#endif
 
     void drawPanelFrame (juce::Graphics& g);
     void drawLogo (juce::Graphics& g, juce::Rectangle<float> bounds);
@@ -91,6 +105,15 @@ private:
     juce::Label metersLabel;
     LevelMeter inputMeter;
     LevelMeter outputMeter;
+
+#if STRINGLIFE_ENABLE_LICENSING
+    LicenseOverlayComponent licenseOverlay;
+    juce::Label licenseOverlayTitleLabel;
+    juce::Label licenseOverlayStatusLabel;
+    juce::TextButton activateButton { "ACTIVATE" };
+    juce::TextButton trialButton { "TRIAL" };
+    bool licenseOverlayDismissed = false;
+#endif
 
     juce::Label versionLabel;
 

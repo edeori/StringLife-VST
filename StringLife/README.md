@@ -21,6 +21,24 @@ Requires CMake 3.22+. JUCE is fetched automatically via `FetchContent` (tag
 On macOS the build targets `arm64;x86_64` with a deployment target of macOS
 12.0.
 
+### Licensing config overrides
+
+The licensed build embeds `Assets/licensing_config.json` by default. For local
+server testing, build-time values can override the embedded JSON without
+editing the asset file:
+
+```bash
+LICENSE_SERVER_BASE_URL=http://127.0.0.1:8787 \
+LICENSE_PRODUCT_ID=stringlife \
+./build.sh licensed
+```
+
+Supported build-time overrides:
+
+- `LICENSE_SERVER_BASE_URL`
+- `LICENSE_PRODUCT_ID`
+- `LICENSE_PUBLIC_KEY`
+
 ## Parameters
 
 - **String Age** — master macro (0 = Dead, 1 = Fresh) driving four advanced

@@ -1,11 +1,35 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+#if STRINGLIFE_ENABLE_LICENSING
+#include "BinaryData.h"
+#endif
+
 StringLifeAudioProcessor::StringLifeAudioProcessor()
     : AudioProcessor (BusesProperties()
                         .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
                         .withOutput ("Output", juce::AudioChannelSet::stereo(), true))
 {
+#if STRINGLIFE_ENABLE_LICENSING
+    juce::String configError;
+    const auto configJson = juce::String::fromUTF8 (BinaryData::licensing_config_json,
+                                                    BinaryData::licensing_config_jsonSize);
+    auto licenseConfig = licensing::LicenseConfig::fromJsonString (configJson, configError);
+
+    if (licenseConfig.isValid())
+        licensing::LicenseConfig::applyPreprocessorOverrides (licenseConfig);
+    else
+    {
+        auto fallback = licensing::LicenseConfig::fromPreprocessorDefinitions (configError);
+
+        if (fallback.isValid())
+            licenseConfig = fallback;
+    }
+
+    if (! licenseManager.initialise (licenseConfig, configError))
+        DBG ("Licensing initialisation failed: " + configError);
+#endif
+
     stringAgeParam  = apvts.getRawParameterValue (ParamIDs::stringAge);
     instrumentParam = apvts.getRawParameterValue (ParamIDs::instrument);
     presenceParam   = apvts.getRawParameterValue (ParamIDs::presenceAmount);
@@ -230,6 +254,15 @@ void StringLifeAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 {
     juce::ScopedNoDenormals noDenormals;
     juce::ignoreUnused (midiMessages);
+
+#if STRINGLIFE_ENABLE_LICENSING
+    if (! licenseManager.isAudioEnabled())
+    {
+        buffer.clear();
+        outputLevelDb.store (-100.0f);
+        return;
+    }
+#endif
 
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();

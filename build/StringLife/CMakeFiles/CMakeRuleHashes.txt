@@ -1,0 +1,5 @@
+# Hashes of file build rules.
+bc15b8b3f68b1d868400833cea38f65d StringLife_artefacts/JuceLibraryCode/StringLife_AU/PkgInfo
+bb27ff70773d0e2bd01e1197b478d0e6 StringLife_artefacts/JuceLibraryCode/StringLife_Standalone/PkgInfo
+1c1532989f87e0cdf04be5fecfe2bf2b StringLife_artefacts/JuceLibraryCode/StringLife_VST3/PkgInfo
+7e1088cdf43f8b33f6687c281a6eb704 juce_binarydata_StringLifeAssets/JuceLibraryCode/BinaryData1.cpp

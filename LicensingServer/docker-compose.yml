@@ -1,0 +1,15 @@
+services:
+  licensing-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stringlife-licensing-server
+    ports:
+      - "8787:8787"
+    env_file:
+      - .env
+    environment:
+      LICENSING_SERVER_HOST: 0.0.0.0
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

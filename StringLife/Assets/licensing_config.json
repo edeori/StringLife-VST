@@ -1,0 +1,18 @@
+{
+  "companyName": "Moth Production",
+  "applicationName": "StringLife",
+  "productId": "stringlife",
+  "productVersion": "1.6.2",
+  "serverBaseUrl": "http://127.0.0.1:8787",
+  "publicKey": "10001,f18fed163aefcd9aa8b5dd68df6bf5d44c3e8b21c063c8986e1e53a83e03f9bdf37ed40d8c877f1c48c45df3cc07098d8e635f5b5f1265c484757763eb94340b771d62016acfb714a9401de58439f50b8bb37006f296e7521472505f8055bf38efb065f177db2e58bbb18aba446d3796b9517bdc11ae57df7b040f2ceba04997f97a431e24ca4ba70d8ceeab2dd8ab650b328bba3aeee982f75e4de4868a5286770b8df2301eb925f91bd2948d97257867638cad6c3b0e75c9f6544a4ca8f114ea175083f3195f0cface1d1dc0061057e220ce42d6db90f9d5f555143f8423cb60e80930f34582e30b6824e4f4527e93462257638ee8baf138b4c60c94ca09f5",
+  "trialLengthDays": 15,
+  "offlineGracePeriodDays": 14,
+  "requestTimeoutMs": 5000,
+  "allowUnsignedDevelopmentLicenses": false,
+  "endpoints": {
+    "activate": "/activate",
+    "validate": "/validate",
+    "refresh": "/refresh",
+    "deactivate": "/deactivate"
+  }
+}

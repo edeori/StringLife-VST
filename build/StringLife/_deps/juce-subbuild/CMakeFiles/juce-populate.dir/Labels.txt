@@ -1,0 +1,14 @@
+# Target labels
+ juce-populate
+# Source files and their labels
+/Users/mothproduction/Documents/VSCode/StringLife-VST/build/StringLife/_deps/juce-subbuild/CMakeFiles/juce-populate
+/Users/mothproduction/Documents/VSCode/StringLife-VST/build/StringLife/_deps/juce-subbuild/CMakeFiles/juce-populate.rule
+/Users/mothproduction/Documents/VSCode/StringLife-VST/build/StringLife/_deps/juce-subbuild/CMakeFiles/juce-populate-complete.rule
+/Users/mothproduction/Documents/VSCode/StringLife-VST/build/StringLife/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/juce-populate-build.rule
+/Users/mothproduction/Documents/VSCode/StringLife-VST/build/StringLife/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/juce-populate-configure.rule
+/Users/mothproduction/Documents/VSCode/StringLife-VST/build/StringLife/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/juce-populate-download.rule
+/Users/mothproduction/Documents/VSCode/StringLife-VST/build/StringLife/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/juce-populate-install.rule
+/Users/mothproduction/Documents/VSCode/StringLife-VST/build/StringLife/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/juce-populate-mkdir.rule
+/Users/mothproduction/Documents/VSCode/StringLife-VST/build/StringLife/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/juce-populate-patch.rule
+/Users/mothproduction/Documents/VSCode/StringLife-VST/build/StringLife/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/juce-populate-test.rule
+/Users/mothproduction/Documents/VSCode/StringLife-VST/build/StringLife/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/juce-populate-update.rule
