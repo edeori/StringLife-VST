@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from fastapi import Depends, FastAPI, Form, Query
-from fastapi.responses import HTMLResponse, RedirectResponse
+import ipaddress
+
+from fastapi import Depends, FastAPI, Form, HTTPException, Query
+from fastapi.requests import Request
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from sqlmodel import Session
 
-from .database import create_db_and_tables, get_session
+from .config import settings
+from .database import check_database_connection, create_db_and_tables, get_session
 from .schemas import AdminOverviewResponse, CreateLicenseRequest, CreateProductRequest, LicenseRequest, LicenseResponse
 from .service import (
     activate_license,
@@ -23,6 +27,57 @@ from .service import (
 
 
 app = FastAPI(title="Plugin Licensing Server", version="0.1.0")
+
+ADMIN_PATH_PREFIXES = ("/admin",)
+PUBLIC_API_PATHS = {"/activate", "/validate", "/refresh", "/deactivate"}
+_admin_allowed_networks = tuple(ipaddress.ip_network(value, strict=False) for value in settings.admin_allowed_cidrs)
+_trusted_proxy_networks = tuple(ipaddress.ip_network(value, strict=False) for value in settings.trusted_proxy_cidrs)
+
+
+def _ip_in_networks(ip_text: str, networks: tuple[ipaddress._BaseNetwork, ...]) -> bool:
+    try:
+        ip_value = ipaddress.ip_address(ip_text)
+    except ValueError:
+        return False
+
+    return any(ip_value in network for network in networks)
+
+
+def _resolve_client_ip(request: Request) -> str:
+    direct_peer = request.client.host if request.client else ""
+
+    if not settings.trust_proxy_headers or not direct_peer:
+        return direct_peer
+
+    if not _ip_in_networks(direct_peer, _trusted_proxy_networks):
+        return direct_peer
+
+    forwarded_for = request.headers.get("x-forwarded-for", "")
+
+    if not forwarded_for:
+        return direct_peer
+
+    first_hop = forwarded_for.split(",", 1)[0].strip()
+    return first_hop or direct_peer
+
+
+@app.middleware("http")
+async def restrict_admin_to_allowed_networks(request: Request, call_next):
+    path = request.url.path
+
+    if path.startswith(ADMIN_PATH_PREFIXES) and not settings.expose_admin_ui:
+        return PlainTextResponse("Admin UI is disabled on this listener", status_code=404)
+
+    if path in PUBLIC_API_PATHS and not settings.expose_public_api:
+        return PlainTextResponse("Public licensing API is disabled on this listener", status_code=404)
+
+    if path.startswith(ADMIN_PATH_PREFIXES):
+        client_ip = _resolve_client_ip(request)
+
+        if not _ip_in_networks(client_ip, _admin_allowed_networks):
+            return HTMLResponse("Admin access is restricted", status_code=403)
+
+    return await call_next(request)
 
 
 def render_admin_page(data: AdminOverviewResponse) -> str:
@@ -261,6 +316,11 @@ def on_startup() -> None:
 
 @app.get("/health")
 def health() -> dict[str, str]:
+    try:
+        check_database_connection()
+    except Exception as exc:  # pragma: no cover - operational path
+        raise HTTPException(status_code=503, detail=f"database unavailable: {exc}") from exc
+
     return {"status": "ok"}
 
 

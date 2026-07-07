@@ -1,0 +1,13 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+*.db
+data/
+pgdata/
+backups/
+keys/
+stringlife_licensing_server.egg-info/

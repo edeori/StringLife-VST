@@ -1,7 +1,9 @@
 #!/usr/bin/env sh
 set -eu
 
-mkdir -p /app/data
+mkdir -p /app/backups
+
+python3 scripts/wait_for_db.py
 
 if [ "${LICENSING_SEED_DEMO_DATA:-false}" = "true" ]; then
   python3 scripts/seed_demo_data.py
