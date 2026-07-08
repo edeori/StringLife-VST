@@ -67,6 +67,12 @@ juce_add_plugin(StringLife
     AU_MAIN_TYPE kAudioUnitType_Effect
 )
 
+if (APPLE AND STRINGLIFE_ENABLE_LICENSING)
+    set_target_properties(StringLife PROPERTIES
+        JUCE_PLIST_TO_MERGE
+            "<key>NSAppTransportSecurity</key><dict><key>NSAllowsArbitraryLoads</key><true/></dict>")
+endif()
+
 set(STRINGLIFE_SOURCES
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp

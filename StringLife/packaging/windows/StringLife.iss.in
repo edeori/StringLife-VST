@@ -1,0 +1,45 @@
+#define MyAppName "StringLife"
+#define MyAppVersion "@APP_VERSION@"
+#define MyAppPublisher "Moth Production"
+#define MyAppURL "https://mothproduction.hu"
+#define MyAppExeName "StringLife.exe"
+#define MyAppProfile "@PROFILE@"
+#define MyBuildRoot "@BUILD_ROOT@"
+
+[Setup]
+AppId={{7C84DC5C-2D2C-4950-B8AE-DA3F0B977B00}
+AppName={#MyAppName}
+AppVersion={#MyAppVersion}
+AppPublisher={#MyAppPublisher}
+AppPublisherURL={#MyAppURL}
+AppSupportURL={#MyAppURL}
+AppUpdatesURL={#MyAppURL}
+DefaultDirName={autopf}\{#MyAppPublisher}\{#MyAppName}
+DefaultGroupName={#MyAppName}
+DisableProgramGroupPage=yes
+OutputDir={#MyBuildRoot}\installer
+OutputBaseFilename=StringLife-{#MyAppProfile}-Setup
+Compression=lzma
+SolidCompression=yes
+WizardStyle=modern
+ArchitecturesInstallIn64BitMode=x64compatible
+PrivilegesRequired=admin
+UninstallDisplayIcon={app}\{#MyAppExeName}
+
+[Languages]
+Name: "english"; MessagesFile: "compiler:Default.isl"
+
+[Tasks]
+Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked
+
+[Files]
+Source: "{#MyBuildRoot}\Standalone\StringLife.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#MyBuildRoot}\Standalone\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#MyBuildRoot}\VST3\StringLife.vst3\*"; DestDir: "{commoncf64}\VST3\StringLife.vst3"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[Icons]
+Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+
+[Run]
+Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent

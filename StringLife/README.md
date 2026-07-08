@@ -21,6 +21,108 @@ Requires CMake 3.22+. JUCE is fetched automatically via `FetchContent` (tag
 On macOS the build targets `arm64;x86_64` with a deployment target of macOS
 12.0.
 
+### Convenience build script
+
+```bash
+./build.sh licensed
+./build.sh local-dev
+```
+
+This produces flattened artefacts under:
+
+- `build/licensed/Standalone/StringLife.app`
+- `build/licensed/VST3/StringLife.vst3`
+- `build/licensed/AU/StringLife.component`
+
+or the same layout under `build/local-dev/`.
+
+### macOS installer package
+
+For a normal macOS installer (`next -> next -> finish`), build a `.pkg`:
+
+```bash
+./package.sh licensed
+./package.sh local-dev
+```
+
+This creates:
+
+- `build/licensed/StringLife-licensed.pkg`
+- `build/local-dev/StringLife-local-dev.pkg`
+
+The installer places the plugin system-wide into:
+
+- `/Library/Audio/Plug-Ins/VST3/StringLife.vst3`
+- `/Library/Audio/Plug-Ins/Components/StringLife.component`
+- `/Applications/Moth Production/StringLife.app`
+
+Notes:
+
+- the `.pkg` is currently unsigned
+- for public release you should sign and notarize both the app/plugin bundles and the final installer package
+- the installer is the right approach if you want AU, VST3 and the standalone app to land in the expected macOS locations automatically
+
+### Windows installer package
+
+For Windows, the repo now includes an Inno Setup based installer flow.
+
+If you want to generate or inspect the installer script from macOS, install
+PowerShell first:
+
+```bash
+brew install powershell
+pwsh ./package-windows.ps1 licensed
+```
+
+This lets you run the packaging helper on macOS, but it does **not** replace a
+real Windows packaging/signing step. The final installer still needs Inno
+Setup and release signing on Windows.
+
+If the script says `Missing build artefact ... StringLife.exe`, that usually
+just means you are running it on macOS without an actual Windows build output.
+That is expected. The helper packages Windows artefacts; it does not create
+them from the macOS build.
+
+Expected Windows build artefacts:
+
+- `build/<profile>/Standalone/StringLife.exe`
+- `build/<profile>/VST3/StringLife.vst3`
+
+Then on a Windows machine:
+
+```powershell
+.\package-windows.ps1 licensed
+.\package-windows.ps1 local-dev
+```
+
+This script:
+
+- checks the expected build outputs
+- generates an `.iss` installer script from `packaging/windows/StringLife.iss.in`
+- invokes Inno Setup if `ISCC.exe` is installed
+
+Default Inno Setup location:
+
+- `C:\Program Files (x86)\Inno Setup 6\ISCC.exe`
+
+Or override it with:
+
+```powershell
+$env:INNO_SETUP_COMPILER = "C:\Path\To\ISCC.exe"
+.\package-windows.ps1 licensed
+```
+
+The generated installer places:
+
+- the standalone app into `Program Files\Moth Production\StringLife`
+- the VST3 plugin into `C:\Program Files\Common Files\VST3\StringLife.vst3`
+
+Notes:
+
+- AU is macOS-only, so it is not part of the Windows installer
+- `pwsh` can run the helper on macOS, but the actual installer compile step still depends on Windows + Inno Setup unless you provide a compatible `ISCC.exe` environment yourself
+- for public release, sign both the binaries and the final installer `.exe`
+
 ### Licensing config overrides
 
 The licensed build embeds `Assets/licensing_config.json` by default. For local
@@ -38,6 +140,23 @@ Supported build-time overrides:
 - `LICENSE_SERVER_BASE_URL`
 - `LICENSE_PRODUCT_ID`
 - `LICENSE_PUBLIC_KEY`
+
+### Reusable licensing stack
+
+The reusable licensing module and the central licensing server were moved into
+a separate repository:
+
+- `/Users/mothproduction/Documents/VSCode/Licensing-VST`
+
+That repo now contains:
+
+- the reusable JUCE client module
+- the FastAPI licensing server
+- Docker deployment files
+- integration prompts for adding the licensing flow to other apps/plugins
+
+`StringLife` now acts as one concrete integration example of that shared
+licensing stack.
 
 ## Parameters
 
