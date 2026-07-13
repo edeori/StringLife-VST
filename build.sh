@@ -14,14 +14,14 @@ PROFILE="${1:-licensed}"
 case "$PROFILE" in
   licensed)
     LICENSING_FLAG=ON
-    BUILD_DIR="build/licensed"
+    BUILD_DIR="build/Release/licensed"
     ;;
-  local-dev)
+  dev)
     LICENSING_FLAG=OFF
-    BUILD_DIR="build/local-dev"
+    BUILD_DIR="build/Release/dev"
     ;;
   *)
-    echo "Usage: $0 [licensed|local-dev]" >&2
+    echo "Usage: $0 [licensed|dev]" >&2
     exit 1
     ;;
 esac

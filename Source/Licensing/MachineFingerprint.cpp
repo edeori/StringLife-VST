@@ -4,6 +4,7 @@
 
 #if JUCE_MAC
  #include <CommonCrypto/CommonDigest.h>
+ #include <SystemConfiguration/SystemConfiguration.h>
 #elif JUCE_WINDOWS
  #include <windows.h>
  #include <bcrypt.h>
@@ -56,12 +57,29 @@ juce::String sha256Hex (const juce::MemoryBlock& data)
 
     return hex;
 }
+
+#if JUCE_MAC
+juce::String getStableMachineName()
+{
+    CFStringEncoding encoding = kCFStringEncodingUTF8;
+    auto name = juce::String::fromCFString (SCDynamicStoreCopyComputerName (nullptr, &encoding)).trim();
+
+    if (name.isNotEmpty())
+        return name;
+
+    return juce::SystemStats::getComputerName().trim();
+}
+#endif
 }
 
 juce::String MachineFingerprint::createMachineIdHash()
 {
     juce::StringArray parts;
     parts.add (juce::SystemStats::getOperatingSystemName());
+
+   #if JUCE_MAC
+    parts.add (getStableMachineName());
+   #else
     parts.add (juce::SystemStats::getComputerName());
 
     juce::Array<juce::MACAddress> macAddresses;
@@ -78,6 +96,7 @@ juce::String MachineFingerprint::createMachineIdHash()
 
     normalisedAddresses.sort (true);
     parts.addArray (normalisedAddresses);
+   #endif
 
     const auto raw = parts.joinIntoString ("|");
     const auto* utf8 = raw.toRawUTF8();

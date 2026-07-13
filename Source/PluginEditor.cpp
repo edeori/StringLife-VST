@@ -2,7 +2,6 @@
 #include "StringLifeFonts.h"
 #include "BinaryData.h"
 #include <juce_gui_extra/juce_gui_extra.h>
-#include <array>
 
 namespace
 {
@@ -10,33 +9,13 @@ namespace
 
     // Reference window size the design-space pixel values in resized() are
     // measured at - the window is resizable with this aspect ratio locked,
-    // and every position, size and font scales uniformly from here.
-    constexpr int designWidth  = 560;
-    constexpr int designHeight = 500;
-
-    // The Monitor and In/Out boxes are recessed rounded rects baked directly
-    // into the background panel artwork, not something we draw ourselves -
-    // these fractions are the pixel bounds of those two boxes measured
-    // directly from Assets/background_panel.png (a 1448x1086 source image),
-    // so the real components we lay on top can be positioned to land
-    // exactly inside the printed frame instead of drifting off it.
-    constexpr float bottomBoxTopFrac      = 667.0f  / 1086.0f;
-    constexpr float bottomBoxBottomFrac   = 928.0f  / 1086.0f;
-    constexpr float monitorBoxLeftFrac    = 120.0f  / 1448.0f;
-    constexpr float monitorBoxRightFrac   = 591.0f  / 1448.0f;
-    constexpr float meterBoxLeftFrac      = 1038.0f / 1448.0f;
-    constexpr float meterBoxRightFrac     = 1325.0f / 1448.0f;
-
-    // The In/Out box also has its own baked-in header strip and two vertical
-    // meter slots (with a gap between them, and a wider margin after the
-    // second slot) - measured the same way as the outer boxes above, so the
-    // meter components sit exactly inside their printed cutouts instead of
-    // overflowing past them.
-    constexpr float meterHeaderBottomFrac = 723.0f  / 1086.0f;
-    constexpr float meterSlot1LeftFrac    = 1065.0f / 1448.0f;
-    constexpr float meterSlot1RightFrac   = 1165.0f / 1448.0f;
-    constexpr float meterSlot2LeftFrac    = 1199.0f / 1448.0f;
-    constexpr float meterSlot2RightFrac   = 1298.0f / 1448.0f;
+    // and every position, size and font scales uniformly from here. This
+    // now matches Assets/background_panel.png (820x626) exactly, which is
+    // itself a literal 1:1 render of the mockup's own CSS grid (see
+    // Mockup/stringlife-ui.html) - so every design-space pixel value below
+    // is copied straight from that stylesheet rather than measured/guessed.
+    constexpr int designWidth  = 820;
+    constexpr int designHeight = 626;
 }
 
 #if STRINGLIFE_ENABLE_LICENSING
@@ -91,9 +70,10 @@ void LevelMeter::timerCallback()
 void LevelMeter::paint (juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat();
+    constexpr float cornerSize = 8.0f; // matches .vertical-meter's own border-radius
 
-    g.setColour (juce::Colour (0xff0c0d0f));
-    g.fillRoundedRectangle (bounds, 2.0f);
+    g.setColour (juce::Colour (0xff040609));
+    g.fillRoundedRectangle (bounds, cornerSize);
 
     auto normalise = [] (float db)
     {
@@ -101,16 +81,25 @@ void LevelMeter::paint (juce::Graphics& g)
     };
 
     auto levelFraction = normalise (displayedLevelDb);
-    auto meterBounds = bounds.withTop (bounds.getBottom() - bounds.getHeight() * levelFraction);
-    g.setColour (StringLifeLookAndFeel::getAccentColour());
-    g.fillRoundedRectangle (meterBounds, 2.0f);
+    auto meterBounds = bounds.reduced (2.0f).withTop (bounds.getBottom() - 2.0f - (bounds.getHeight() - 4.0f) * levelFraction);
+
+    if (! meterBounds.isEmpty())
+    {
+        // Three-stop gradient matching .vertical-meter span in the mockup:
+        // accent (low) -> yellow-green (mid) -> red (peak).
+        juce::ColourGradient fillGradient (StringLifeLookAndFeel::getAccentColour(), 0.0f, bounds.getBottom(),
+                                           juce::Colour (0xffff565b), 0.0f, bounds.getY(), false);
+        fillGradient.addColour (0.75, juce::Colour (0xffd6e447));
+        g.setGradientFill (fillGradient);
+        g.fillRoundedRectangle (meterBounds, cornerSize * 0.6f);
+    }
 
     auto peakY = bounds.getBottom() - bounds.getHeight() * normalise (peakHoldDb);
     g.setColour (juce::Colours::white);
     g.fillRect (bounds.getX(), peakY - 1.0f, bounds.getWidth(), 2.0f);
 
-    g.setColour (juce::Colours::white.withAlpha (0.15f));
-    g.drawRoundedRectangle (bounds, 2.0f, 1.0f);
+    g.setColour (juce::Colour (0xff2c333b));
+    g.drawRoundedRectangle (bounds.reduced (0.5f), cornerSize, 1.0f);
 }
 
 //==============================================================================
@@ -150,6 +139,10 @@ StringLifeAudioProcessorEditor::StringLifeAudioProcessorEditor (StringLifeAudioP
     titleLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.95f));
     addAndMakeVisible (titleLabel);
 
+    taglineLabel.setText (withLetterSpacing ("RESTORE TIRED STRINGS"), juce::dontSendNotification);
+    taglineLabel.setColour (juce::Label::textColourId, juce::Colours::grey.withAlpha (0.85f));
+    addAndMakeVisible (taglineLabel);
+
     guitarButton.setClickingTogglesState (false);
     bassButton.setClickingTogglesState (false);
     StringLifeLookAndFeel::markAsInstrumentButton (guitarButton);
@@ -159,10 +152,58 @@ StringLifeAudioProcessorEditor::StringLifeAudioProcessorEditor (StringLifeAudioP
     addAndMakeVisible (guitarButton);
     addAndMakeVisible (bassButton);
 
+    monitorKicker.setText (withLetterSpacing ("MONITOR"), juce::dontSendNotification);
+    monitorKicker.setJustificationType (juce::Justification::centredRight);
+    monitorKicker.setColour (juce::Label::textColourId, juce::Colours::grey);
+    addAndMakeVisible (monitorKicker);
+
+    // Normal/Delta is a simple two-way pill-tab selector, exactly the same
+    // visual role as Guitar/Bass above - reuses that same button tier rather
+    // than inventing a near-identical new one.
+    normalButton.setClickingTogglesState (false);
+    deltaButton.setClickingTogglesState (false);
+    StringLifeLookAndFeel::markAsInstrumentButton (normalButton);
+    StringLifeLookAndFeel::markAsInstrumentButton (deltaButton);
+    normalButton.onClick = [this] { setChoiceParam (ParamIDs::monitorMode, 0); };
+    deltaButton.onClick  = [this] { setChoiceParam (ParamIDs::monitorMode, 1); };
+    addAndMakeVisible (normalButton);
+    addAndMakeVisible (deltaButton);
+
+    // Header actions: A/B compare and hard Bypass, top-right next to the
+    // version number.
+    bypassButton.setClickingTogglesState (true);
+    addAndMakeVisible (bypassButton);
+    bypassAttachment = std::make_unique<ButtonAttachment> (apvts, ParamIDs::bypass, bypassButton);
+
+    abButton.setClickingTogglesState (true);
+    StringLifeLookAndFeel::markAsAlwaysActive (abButton);
+    addAndMakeVisible (abButton);
+    abAttachment = std::make_unique<ButtonAttachment> (apvts, ParamIDs::abCompare, abButton);
+
+    stringAgeTitleLabel.setText (withLetterSpacing ("STRING AGE"), juce::dontSendNotification);
+    stringAgeTitleLabel.setColour (juce::Label::textColourId, StringLifeLookAndFeel::getSectionTitleColour());
+    addAndMakeVisible (stringAgeTitleLabel);
+
+    macroControlKicker.setText (withLetterSpacing ("MACRO CONTROL"), juce::dontSendNotification);
+    macroControlKicker.setJustificationType (juce::Justification::centredRight);
+    macroControlKicker.setColour (juce::Label::textColourId, juce::Colours::grey);
+    addAndMakeVisible (macroControlKicker);
+
+    revivalKicker.setText (withLetterSpacing ("REVIVAL"), juce::dontSendNotification);
+    revivalKicker.setJustificationType (juce::Justification::centred);
+    revivalKicker.setColour (juce::Label::textColourId, StringLifeLookAndFeel::getAccentColour());
+    addAndMakeVisible (revivalKicker);
+
+    stringAgeValueLabel.setJustificationType (juce::Justification::centred);
+    stringAgeValueLabel.setColour (juce::Label::textColourId, StringLifeLookAndFeel::getAccentHotColour());
+    addAndMakeVisible (stringAgeValueLabel);
+
     deadLabel.setText (withLetterSpacing ("DEAD"), juce::dontSendNotification);
+    balancedLabel.setText (withLetterSpacing ("BALANCED"), juce::dontSendNotification);
+    balancedLabel.setJustificationType (juce::Justification::centred);
     freshLabel.setText (withLetterSpacing ("FRESH"), juce::dontSendNotification);
     freshLabel.setJustificationType (juce::Justification::centredRight);
-    for (auto* l : { &deadLabel, &freshLabel })
+    for (auto* l : { &deadLabel, &balancedLabel, &freshLabel })
     {
         l->setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.7f));
         addAndMakeVisible (l);
@@ -173,10 +214,6 @@ StringLifeAudioProcessorEditor::StringLifeAudioProcessorEditor (StringLifeAudioP
     addAndMakeVisible (stringAgeSlider);
     stringAgeAttachment = std::make_unique<SliderAttachment> (apvts, ParamIDs::stringAge, stringAgeSlider);
 
-    stringAgeValueLabel.setJustificationType (juce::Justification::centred);
-    stringAgeValueLabel.setColour (juce::Label::textColourId, StringLifeLookAndFeel::getAccentColour());
-    addAndMakeVisible (stringAgeValueLabel);
-
     auto setupAdvancedSlider = [this] (juce::Slider& slider, juce::Label& nameLabel, juce::Label& valueLabel,
                                         const juce::String& name)
     {
@@ -186,11 +223,12 @@ StringLifeAudioProcessorEditor::StringLifeAudioProcessorEditor (StringLifeAudioP
 
         nameLabel.setText (withLetterSpacing (name), juce::dontSendNotification);
         nameLabel.setJustificationType (juce::Justification::centred);
-        nameLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.7f));
+        nameLabel.setColour (juce::Label::textColourId, StringLifeLookAndFeel::getAccentColour());
         addAndMakeVisible (nameLabel);
 
         valueLabel.setJustificationType (juce::Justification::centred);
-        valueLabel.setColour (juce::Label::textColourId, StringLifeLookAndFeel::getAccentColour());
+        valueLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.92f));
+        StringLifeLookAndFeel::markAsFieldValue (valueLabel);
         addAndMakeVisible (valueLabel);
     };
 
@@ -204,26 +242,21 @@ StringLifeAudioProcessorEditor::StringLifeAudioProcessorEditor (StringLifeAudioP
     harmonicAttachment = std::make_unique<SliderAttachment> (apvts, ParamIDs::harmonicExcite, harmonicSlider);
     sustainAttachment  = std::make_unique<SliderAttachment> (apvts, ParamIDs::sustainShape, sustainSlider);
 
-    monitorLabel.setText (withLetterSpacing ("MONITOR"), juce::dontSendNotification);
-    monitorLabel.setJustificationType (juce::Justification::centred);
-    monitorLabel.setColour (juce::Label::textColourId, juce::Colours::grey);
-    addAndMakeVisible (monitorLabel);
+    ioTitleLabel.setText (withLetterSpacing ("INPUT / OUTPUT"), juce::dontSendNotification);
+    ioTitleLabel.setColour (juce::Label::textColourId, StringLifeLookAndFeel::getSectionTitleColour());
+    addAndMakeVisible (ioTitleLabel);
 
-    normalButton.setClickingTogglesState (false);
-    deltaButton.setClickingTogglesState (false);
-    normalButton.onClick = [this] { setChoiceParam (ParamIDs::monitorMode, 0); };
-    deltaButton.onClick  = [this] { setChoiceParam (ParamIDs::monitorMode, 1); };
-    addAndMakeVisible (normalButton);
-    addAndMakeVisible (deltaButton);
+    inKicker.setText (withLetterSpacing ("IN"), juce::dontSendNotification);
+    outKicker.setText (withLetterSpacing ("OUT"), juce::dontSendNotification);
+    for (auto* l : { &inKicker, &outKicker })
+    {
+        l->setJustificationType (juce::Justification::centred);
+        l->setColour (juce::Label::textColourId, juce::Colours::grey);
+        addAndMakeVisible (l);
+    }
 
-    bypassButton.setClickingTogglesState (true);
-    addAndMakeVisible (bypassButton);
-    bypassAttachment = std::make_unique<ButtonAttachment> (apvts, ParamIDs::bypass, bypassButton);
-
-    abButton.setClickingTogglesState (true);
-    StringLifeLookAndFeel::markAsAlwaysActive (abButton);
-    addAndMakeVisible (abButton);
-    abAttachment = std::make_unique<ButtonAttachment> (apvts, ParamIDs::abCompare, abButton);
+    addAndMakeVisible (inputMeter);
+    addAndMakeVisible (outputMeter);
 
     wetDrySlider.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
     wetDrySlider.setTextBoxStyle (juce::Slider::NoTextBox, true, 0, 0);
@@ -235,13 +268,10 @@ StringLifeAudioProcessorEditor::StringLifeAudioProcessorEditor (StringLifeAudioP
     wetDryLabel.setColour (juce::Label::textColourId, juce::Colours::grey);
     addAndMakeVisible (wetDryLabel);
 
-    metersLabel.setText (withLetterSpacing ("IN / OUT"), juce::dontSendNotification);
-    metersLabel.setJustificationType (juce::Justification::centred);
-    metersLabel.setColour (juce::Label::textColourId, juce::Colours::grey);
-    addAndMakeVisible (metersLabel);
-
-    addAndMakeVisible (inputMeter);
-    addAndMakeVisible (outputMeter);
+    wetDryValueLabel.setJustificationType (juce::Justification::centred);
+    wetDryValueLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.92f));
+    StringLifeLookAndFeel::markAsFieldValue (wetDryValueLabel);
+    addAndMakeVisible (wetDryValueLabel);
 
 #if STRINGLIFE_ENABLE_LICENSING
     licenseOverlay.setInterceptsMouseClicks (true, true);
@@ -278,7 +308,6 @@ StringLifeAudioProcessorEditor::StringLifeAudioProcessorEditor (StringLifeAudioP
 
     updateInstrumentButtons();
     updateMonitorButtons();
-    updateCompareButtonLabel();
 
 #if STRINGLIFE_ENABLE_LICENSING
     updateLicenseUi();
@@ -308,23 +337,38 @@ void StringLifeAudioProcessorEditor::setChoiceParam (const juce::String& paramID
 
 void StringLifeAudioProcessorEditor::updateFonts (float scale)
 {
-    manufacturerLabel.setFont (StringLifeFonts::uiLight (10.0f * scale));
-    titleLabel.setFont (StringLifeFonts::title (28.0f * scale));
-    versionLabel.setFont (StringLifeFonts::uiLight (9.0f * scale));
+    // Sizes below are copied straight from the mockup's own CSS (Mockup/
+    // stringlife-ui.html + the shared moth-ui.css it imports) - the
+    // background art is a literal 1:1 render of that same 820-wide canvas,
+    // so a design-space point size here is the same number the stylesheet
+    // uses in px.
+    manufacturerLabel.setFont (StringLifeFonts::uiLight (12.0f * scale));
+    titleLabel.setFont (StringLifeFonts::title (33.0f * scale));
+    taglineLabel.setFont (StringLifeFonts::uiLight (11.0f * scale));
+    versionLabel.setFont (StringLifeFonts::uiLight (11.0f * scale));
 
-    for (auto* l : { &deadLabel, &freshLabel })
-        l->setFont (StringLifeFonts::uiMedium (13.0f * scale));
+    stringAgeTitleLabel.setFont (StringLifeFonts::title (13.0f * scale));
+    macroControlKicker.setFont (StringLifeFonts::uiMedium (9.5f * scale));
+    revivalKicker.setFont (StringLifeFonts::uiMedium (9.5f * scale));
+    stringAgeValueLabel.setFont (StringLifeFonts::numeric (32.0f * scale));
 
-    stringAgeValueLabel.setFont (StringLifeFonts::numeric (16.0f * scale));
+    for (auto* l : { &deadLabel, &balancedLabel, &freshLabel })
+        l->setFont (StringLifeFonts::uiMedium (10.0f * scale));
 
     for (auto* l : { &presenceNameLabel, &attackNameLabel, &harmonicNameLabel, &sustainNameLabel })
-        l->setFont (StringLifeFonts::uiMedium (12.0f * scale));
+        l->setFont (StringLifeFonts::uiMedium (10.0f * scale));
 
     for (auto* l : { &presenceValueLabel, &attackValueLabel, &harmonicValueLabel, &sustainValueLabel })
-        l->setFont (StringLifeFonts::numeric (13.0f * scale));
+        l->setFont (StringLifeFonts::numeric (12.5f * scale));
 
-    for (auto* l : { &monitorLabel, &wetDryLabel, &metersLabel })
-        l->setFont (StringLifeFonts::uiMedium (10.5f * scale));
+    ioTitleLabel.setFont (StringLifeFonts::title (13.0f * scale));
+
+    for (auto* l : { &inKicker, &outKicker })
+        l->setFont (StringLifeFonts::uiMedium (9.5f * scale));
+
+    monitorKicker.setFont (StringLifeFonts::uiMedium (9.5f * scale));
+    wetDryLabel.setFont (StringLifeFonts::uiMedium (9.5f * scale));
+    wetDryValueLabel.setFont (StringLifeFonts::numeric (14.5f * scale));
 
 #if STRINGLIFE_ENABLE_LICENSING
     licenseOverlayTitleLabel.setFont (StringLifeFonts::title (20.0f * scale));
@@ -364,12 +408,6 @@ void StringLifeAudioProcessorEditor::updateMonitorButtons()
     abButton.setEnabled (! bypassOn);
 }
 
-void StringLifeAudioProcessorEditor::updateCompareButtonLabel()
-{
-    auto abOn = apvts.getRawParameterValue (ParamIDs::abCompare)->load() > 0.5f;
-    abButton.setButtonText (abOn ? "B" : "A");
-}
-
 void StringLifeAudioProcessorEditor::updateAdvancedLabel (juce::Label& valueLabel, juce::Slider& slider)
 {
     valueLabel.setText (juce::String (juce::roundToInt (slider.getValue() * 100.0)) + "%",
@@ -378,8 +416,11 @@ void StringLifeAudioProcessorEditor::updateAdvancedLabel (juce::Label& valueLabe
 
 void StringLifeAudioProcessorEditor::timerCallback()
 {
+    // The mockup's A/B button label is a static "A / B" (only its glow state
+    // toggles), unlike the button text approach this editor used before -
+    // keep the constant text set once at construction, nothing to update here.
     auto ageValue = apvts.getRawParameterValue (ParamIDs::stringAge)->load();
-    stringAgeValueLabel.setText (juce::String (juce::roundToInt (ageValue * 100.0f)) + "% FRESH",
+    stringAgeValueLabel.setText (juce::String (juce::roundToInt (ageValue * 100.0f)) + "%",
                                   juce::dontSendNotification);
 
     updateAdvancedLabel (presenceValueLabel, presenceSlider);
@@ -387,9 +428,11 @@ void StringLifeAudioProcessorEditor::timerCallback()
     updateAdvancedLabel (harmonicValueLabel, harmonicSlider);
     updateAdvancedLabel (sustainValueLabel, sustainSlider);
 
+    wetDryValueLabel.setText (juce::String (juce::roundToInt (wetDrySlider.getValue())) + "%",
+                              juce::dontSendNotification);
+
     updateInstrumentButtons();
     updateMonitorButtons();
-    updateCompareButtonLabel();
 
 #if STRINGLIFE_ENABLE_LICENSING
     updateLicenseUi();
@@ -526,37 +569,84 @@ void StringLifeAudioProcessorEditor::drawLogo (juce::Graphics& g, juce::Rectangl
     g.drawImage (logoImage, bounds, juce::RectanglePlacement::centred);
 }
 
-void StringLifeAudioProcessorEditor::drawMeterScale (juce::Graphics& g)
+void StringLifeAudioProcessorEditor::drawStringArt (juce::Graphics& g, juce::Rectangle<int> bounds)
 {
-    static const std::array<int, 7> dbMarks { 0, -6, -12, -18, -24, -36, -60 };
+    // Decorative backdrop behind the Revival readout - a handful of gently
+    // undulating "guitar string" lines plus two thin diagonal glow lines,
+    // echoing the mockup's .strings/.string-art without reproducing its
+    // exact SVG path data.
+    if (bounds.isEmpty())
+        return;
 
-    auto uiScale = (float) getWidth() / (float) designWidth;
+    auto b = bounds.toFloat();
+    auto accent = StringLifeLookAndFeel::getAccentColour();
 
-    g.setColour (juce::Colours::grey.withAlpha (0.6f));
-    g.setFont (juce::Font (juce::FontOptions (7.0f * uiScale)));
+    g.saveState();
+    juce::Path clip;
+    clip.addRectangle (b);
+    g.reduceClipRegion (clip);
 
-    auto top = (float) meterScaleBounds.getY();
-    auto bottom = (float) meterScaleBounds.getBottom();
-    auto rowHeight = juce::roundToInt (10.0f * uiScale);
+    juce::Random rng (0x53746c66); // fixed seed - stable across repaints/resizes
 
-    // The gap between the slots is only ~14px wide (at design size), so a
-    // small font and no ellipsis - otherwise "-60" renders as "…".
-    for (auto db : dbMarks)
+    for (int i = 0; i < 5; ++i)
     {
-        auto frac = (float) (db + 60) / 60.0f;
-        auto y = bottom - frac * (bottom - top);
-        g.drawText (juce::String (db), meterScaleBounds.getX(), (int) y - rowHeight / 2, meterScaleBounds.getWidth(), rowHeight,
-                    juce::Justification::centred, false);
+        auto yFrac = 0.16f + (float) i * 0.17f;
+        auto baseY = b.getY() + b.getHeight() * yFrac;
+        auto amp = b.getHeight() * (0.05f + rng.nextFloat() * 0.05f);
+
+        juce::Path line;
+        line.startNewSubPath (b.getX(), baseY);
+
+        constexpr int segments = 4;
+        for (int s = 0; s < segments; ++s)
+        {
+            auto x1 = b.getX() + b.getWidth() * ((float) s + 0.5f) / (float) segments;
+            auto x2 = b.getX() + b.getWidth() * (float) (s + 1) / (float) segments;
+            auto y1 = baseY + amp * (rng.nextFloat() * 2.0f - 1.0f);
+            auto y2 = baseY + amp * (rng.nextFloat() * 2.0f - 1.0f);
+            line.quadraticTo (x1, y1, x2, y2);
+        }
+
+        g.setColour (accent.withAlpha (0.10f + (float) (4 - i) * 0.015f));
+        g.strokePath (line, juce::PathStrokeType (1.2f));
     }
+
+    // Two brighter diagonal accent lines, matching .strings::before/::after.
+    auto drawAccentLine = [&] (float yFrac, float rotationDeg)
+    {
+        auto y = b.getY() + b.getHeight() * yFrac;
+        auto x1 = b.getX() + b.getWidth() * 0.08f;
+        auto x2 = b.getX() + b.getWidth() * 0.92f;
+
+        juce::Path line;
+        line.startNewSubPath (x1, y);
+        line.lineTo (x2, y);
+        line.applyTransform (juce::AffineTransform::rotation (juce::degreesToRadians (rotationDeg),
+                                                               b.getCentreX(), b.getCentreY()));
+
+        for (int i = 3; i >= 1; --i)
+        {
+            g.setColour (accent.withAlpha (0.05f / (float) i));
+            g.strokePath (line, juce::PathStrokeType (1.0f + (float) i * 2.0f));
+        }
+
+        g.setColour (accent.withAlpha (0.55f));
+        g.strokePath (line, juce::PathStrokeType (1.0f));
+    };
+
+    drawAccentLine (0.39f, -3.0f);
+    drawAccentLine (0.58f, 2.0f);
+
+    g.restoreState();
 }
 
 void StringLifeAudioProcessorEditor::paint (juce::Graphics& g)
 {
     // Everything visible is either the background artwork itself (with its
-    // own printed divider line and recessed boxes) or a real component laid
-    // on top - no extra drawn dividers or panels.
+    // own printed panel boxes, wells and left-edge accent bar) or a real
+    // component/decoration laid on top - no extra drawn dividers or panels.
     drawPanelFrame (g);
-    drawMeterScale (g);
+    drawStringArt (g, stringArtBounds);
     drawLogo (g, logoBounds);
 }
 
@@ -564,139 +654,153 @@ void StringLifeAudioProcessorEditor::resized()
 {
     auto bounds = getLocalBounds();
 
-    // Everything scales with the window. Background-artwork coordinates
-    // (measured on the 1448x1086 source image) map through bgX/bgY as
-    // fractions of the current size; design-space paddings and component
-    // sizes (laid out for the 560x500 reference window) scale through
-    // px(). The aspect ratio is locked by the constrainer, so the two stay
-    // in sync and nothing drifts off the printed panel features when the
-    // window is resized.
+    // Assets/background_panel.png is a literal 1:1 render of the mockup's
+    // own CSS grid (Mockup/stringlife-ui.html, 820x626) - so every
+    // design-space pixel value below is copied straight from that
+    // stylesheet (header height, content padding, grid-template-rows/
+    // columns, panel padding, knob/field sizes) rather than measured or
+    // guessed, and px() just scales that same 820-wide coordinate space to
+    // whatever size the (aspect-ratio-locked) window currently is.
     auto scale = (float) bounds.getWidth() / (float) designWidth;
-    auto px  = [&] (float designPx) { return juce::roundToInt (designPx * scale); };
-    auto bgX = [&] (float srcX) { return juce::roundToInt (srcX / 1448.0f * (float) bounds.getWidth()); };
-    auto bgY = [&] (float srcY) { return juce::roundToInt (srcY / 1086.0f * (float) bounds.getHeight()); };
+    auto px = [&] (float designPx) { return juce::roundToInt (designPx * scale); };
 
     updateFonts (scale);
 
-    // Topmost strip (between the bezel and the printed divider line):
-    // manufacturer name left, logo centered, version right.
-    juce::Rectangle<int> topStrip (bgX (64.0f), bgY (22.0f),
-                                   bgX (1380.0f) - bgX (64.0f), bgY (100.0f) - bgY (22.0f));
-    manufacturerLabel.setBounds (topStrip.withTrimmedLeft (px (16)).removeFromLeft (px (180)));
-    versionLabel.setBounds (topStrip.withTrimmedRight (px (16)).removeFromRight (px (60)));
+    // ---- Header (moth-header: height 78, padding 0 34) -------------------
+    auto header = bounds.removeFromTop (px (78));
+    auto headerInner = header.reduced (px (34), 0);
 
-    constexpr float logoAspect = 592.0f / 380.0f;   // moth_logo.png source proportions
-    auto logoHeight = 26.0f * scale;
-    logoBounds = juce::Rectangle<float> (logoHeight * logoAspect, logoHeight)
-                     .withCentre (topStrip.toFloat().getCentre());
+    manufacturerLabel.setBounds (headerInner.removeFromLeft (px (180)));
 
-    // Header band between the printed divider and the big content box:
-    // title on the left, instrument toggle centered.
-    juce::Rectangle<int> headerBand (bgX (64.0f), bgY (100.0f),
-                                     bgX (1380.0f) - bgX (64.0f), bgY (263.0f) - bgY (100.0f));
-    titleLabel.setBounds (headerBand.withTrimmedLeft (px (16)).removeFromLeft (px (160)));
+    auto headerActions = headerInner.removeFromRight (px (250));
+    bypassButton.setBounds (headerActions.removeFromRight (px (78)).reduced (0, px (24)));
+    headerActions.removeFromRight (px (12));
+    abButton.setBounds (headerActions.removeFromRight (px (70)).reduced (0, px (24)));
+    headerActions.removeFromRight (px (12));
+    versionLabel.setBounds (headerActions.removeFromRight (px (70)));
 
-    auto instrumentArea = juce::Rectangle<int> (px (146), px (32)).withCentre (headerBand.getCentre());
-    guitarButton.setBounds (instrumentArea.removeFromLeft (px (70)));
-    instrumentArea.removeFromLeft (px (6));
-    bassButton.setBounds (instrumentArea);
+    logoBounds = juce::Rectangle<float> ((float) px (46), (float) px (32)).withCentre (header.toFloat().getCentre());
 
-    // Big content box: string-age slider row tucked into its top, advanced
-    // knob row below.
-    juce::Rectangle<int> contentBox (bgX (64.0f), bgY (263.0f),
-                                     bgX (1380.0f) - bgX (64.0f), bgY (975.0f) - bgY (263.0f));
+    // ---- Content area (moth-content: padding 12 18 56) --------------------
+    auto content = bounds.reduced (px (18), 0);
+    content.removeFromTop (px (12));
+    content.removeFromBottom (px (56));
 
-    auto sliderRow = contentBox.withTrimmedTop (px (12)).removeFromTop (px (30)).reduced (px (20), 0);
-    deadLabel.setBounds (sliderRow.removeFromLeft (px (50)));
-    freshLabel.setBounds (sliderRow.removeFromRight (px (50)));
-    stringAgeSlider.setBounds (sliderRow.reduced (px (6), 0));
-    stringAgeValueLabel.setBounds (contentBox.getX(), contentBox.getY() + px (46), contentBox.getWidth(), px (18));
+    // ---- life-layout (grid-template-rows: 68px 1fr 120px; gap: 10px) -----
+    auto titleRow    = content.removeFromTop (px (68));
+    content.removeFromTop (px (10));
+    auto mainRow     = content.removeFromTop (px (272));
+    content.removeFromTop (px (10));
+    auto advancedRow = content;
 
-    // Advanced parameter row (Spark | Bite | Shimmer | Bloom).
-    auto advancedArea = juce::Rectangle<int> (contentBox.getX() + px (6), contentBox.getY() + px (68),
-                                              contentBox.getWidth() - px (12), px (112));
-    auto colWidth = advancedArea.getWidth() / 4;
+    // ---- life-title (columns: 1fr auto 1fr; padding 0 12) -----------------
+    auto titleInner = titleRow.reduced (px (12), 0);
 
-    auto layoutColumn = [&] (juce::Rectangle<int> col, juce::Label& name, juce::Slider& slider, juce::Label& value)
+    auto monitorBlock = titleInner.removeFromRight (px (150));
+    auto instrumentBlock = juce::Rectangle<int> (px (150), px (31)).withCentre (titleRow.getCentre());
+    auto productBlock = titleInner;
+
+    titleLabel.setBounds (productBlock.removeFromTop (px (40)));
+    productBlock.removeFromTop (px (2));
+    taglineLabel.setBounds (productBlock.removeFromTop (px (18)));
+
+    guitarButton.setBounds (instrumentBlock.removeFromLeft (instrumentBlock.getWidth() / 2).reduced (px (3)));
+    bassButton.setBounds (instrumentBlock.reduced (px (3)));
+
+    monitorKicker.setBounds (monitorBlock.removeFromTop (px (14)));
+    monitorBlock.removeFromTop (px (5));
+    auto monitorModeRow = monitorBlock.removeFromTop (px (31));
+    normalButton.setBounds (monitorModeRow.removeFromLeft (monitorModeRow.getWidth() / 2).reduced (px (3)));
+    deltaButton.setBounds (monitorModeRow.reduced (px (3)));
+
+    // ---- main-row (columns: 1fr 164px; gap: 10px) --------------------------
+    auto ioPanel = mainRow.removeFromRight (px (164));
+    mainRow.removeFromRight (px (10));
+    auto agePanel = mainRow;
+
+    // age-panel (padding: 18 24; rows: auto 1fr 82px)
+    auto ageInner = agePanel.reduced (px (24), px (18));
+    auto ageHead = ageInner.removeFromTop (px (26));
+    stringAgeTitleLabel.setBounds (ageHead.removeFromLeft (ageHead.getWidth() / 2));
+    macroControlKicker.setBounds (ageHead);
+
+    auto ageControlRow = ageInner.removeFromBottom (px (82));
+    stringArtBounds = ageInner;
+
+    auto readoutBlock = juce::Rectangle<int> (px (160), px (58)).withCentre (ageInner.getCentre());
+    revivalKicker.setBounds (readoutBlock.removeFromTop (px (16)));
+    stringAgeValueLabel.setBounds (readoutBlock);
+
+    auto rangeRow = ageControlRow.removeFromTop (px (42));
+    stringAgeSlider.setBounds (rangeRow);
+    ageControlRow.removeFromTop (px (7));
+    auto rangeLabelsRow = ageControlRow.removeFromTop (px (15));
+    auto rangeLabelThird = rangeLabelsRow.getWidth() / 3;
+    deadLabel.setBounds (rangeLabelsRow.removeFromLeft (rangeLabelThird));
+    freshLabel.setBounds (rangeLabelsRow.removeFromRight (rangeLabelThird));
+    balancedLabel.setBounds (rangeLabelsRow);
+
+    // side-panel / Input-Output (padding: 16 14; rows: auto 1fr 100px)
+    auto ioInner = ioPanel.reduced (px (14), px (16));
+    ioTitleLabel.setBounds (ioInner.removeFromTop (px (22)));
+    auto mixBlock = ioInner.removeFromBottom (px (100));
+    auto metersArea = ioInner;
+
+    auto layoutMeter = [&] (juce::Rectangle<int> wrap, LevelMeter& meter, juce::Label& kicker)
     {
-        name.setBounds (col.removeFromTop (px (16)));
-        value.setBounds (col.removeFromBottom (px (16)));
-        slider.setBounds (col.reduced (px (8), 0));
+        auto meterBounds = juce::Rectangle<int> (px (19), px (82)).withCentre (wrap.getCentre());
+        meterBounds.setY (wrap.getY());
+        meter.setBounds (meterBounds);
+        kicker.setBounds (wrap.getX(), meterBounds.getBottom() + px (5), wrap.getWidth(), px (14));
     };
 
-    layoutColumn (advancedArea.removeFromLeft (colWidth), presenceNameLabel, presenceSlider, presenceValueLabel);
-    layoutColumn (advancedArea.removeFromLeft (colWidth), attackNameLabel, attackSlider, attackValueLabel);
-    layoutColumn (advancedArea.removeFromLeft (colWidth), harmonicNameLabel, harmonicSlider, harmonicValueLabel);
-    layoutColumn (advancedArea, sustainNameLabel, sustainSlider, sustainValueLabel);
+    auto inWrap  = metersArea.removeFromLeft (metersArea.getWidth() / 2);
+    auto outWrap = metersArea;
+    layoutMeter (inWrap, inputMeter, inKicker);
+    layoutMeter (outWrap, outputMeter, outKicker);
 
-    // Bottom section: Monitor box | Mix knob | In/Out box. Anchored to the
-    // background artwork's own baked-in box pixels (see the *Frac constants
-    // above) rather than flowing from the cumulative layout above, so these
-    // components land exactly inside the printed frame regardless of how
-    // much vertical space the sections above happened to consume.
-    auto boxTop    = juce::roundToInt (bottomBoxTopFrac    * (float) bounds.getHeight());
-    auto boxBottom = juce::roundToInt (bottomBoxBottomFrac * (float) bounds.getHeight());
+    wetDryLabel.setBounds (mixBlock.removeFromTop (px (14)));
+    mixBlock.removeFromTop (px (4));
+    auto mixKnobRow = mixBlock.removeFromTop (px (52));
+    wetDrySlider.setBounds (juce::Rectangle<int> (px (52), px (52)).withCentre (mixKnobRow.getCentre()));
+    mixBlock.removeFromTop (px (4));
+    wetDryValueLabel.setBounds (juce::Rectangle<int> (px (58), px (27)).withCentre (mixBlock.getCentre()));
 
-    auto monitorArea = juce::Rectangle<int> (
-        juce::roundToInt (monitorBoxLeftFrac * (float) bounds.getWidth()), boxTop,
-        juce::roundToInt ((monitorBoxRightFrac - monitorBoxLeftFrac) * (float) bounds.getWidth()),
-        boxBottom - boxTop);
+    // ---- advanced-row (4 macro panels; columns: repeat(4,1fr); gap 9px) ---
+    auto gap9 = px (9);
+    auto colWidth = (advancedRow.getWidth() - gap9 * 3) / 4;
 
-    auto meterArea = juce::Rectangle<int> (
-        juce::roundToInt (meterBoxLeftFrac * (float) bounds.getWidth()), boxTop,
-        juce::roundToInt ((meterBoxRightFrac - meterBoxLeftFrac) * (float) bounds.getWidth()),
-        boxBottom - boxTop);
+    auto layoutMacro = [&] (juce::Rectangle<int> col, juce::Label& name, juce::Slider& slider, juce::Label& value)
+    {
+        auto inner = col.reduced (px (10), px (9));
+        auto stack = juce::Rectangle<int> (inner.getWidth(), px (97)).withCentre (inner.getCentre());
 
-    auto mixArea = juce::Rectangle<int> (monitorArea.getRight(), boxTop,
-                                          meterArea.getX() - monitorArea.getRight(), boxBottom - boxTop);
+        name.setBounds (stack.removeFromTop (px (14)));
+        stack.removeFromTop (px (1));
+        auto knobRow = stack.removeFromTop (px (60));
+        slider.setBounds (juce::Rectangle<int> (px (60), px (60)).withCentre (knobRow.getCentre()));
+        stack.removeFromTop (px (1));
+        value.setBounds (juce::Rectangle<int> (px (53), px (21)).withCentre (stack.getCentre()));
+    };
 
-    auto monitorInner = monitorArea.reduced (px (10));
-    monitorLabel.setBounds (monitorInner.removeFromTop (px (16)));
-    monitorInner.removeFromTop (px (4));
-    auto modeRow = monitorInner.removeFromTop ((monitorInner.getHeight() - px (4)) / 2);
-    auto modeWidth = modeRow.getWidth() / 2;
-    normalButton.setBounds (modeRow.removeFromLeft (modeWidth).reduced (px (3)));
-    deltaButton.setBounds  (modeRow.reduced (px (3)));
-    monitorInner.removeFromTop (px (4));
-    auto overrideRow = monitorInner;
-    auto overrideWidth = overrideRow.getWidth() / 2;
-    bypassButton.setBounds (overrideRow.removeFromLeft (overrideWidth).reduced (px (3)));
-    abButton.setBounds     (overrideRow.reduced (px (3)));
-
-    wetDryLabel.setBounds (mixArea.removeFromTop (px (16)));
-    wetDrySlider.setBounds (mixArea.withSizeKeepingCentre (px (76), px (76)));
-
-    // Unlike the Monitor box, the In/Out box has its own baked-in header
-    // strip plus two individual meter slot cutouts (with a wider margin
-    // after the second slot than before the first) - anchor each piece to
-    // its own measured rect rather than splitting meterArea evenly, so the
-    // meters land inside their printed slots instead of overflowing them.
-    auto meterHeaderBottom = juce::roundToInt (meterHeaderBottomFrac * (float) bounds.getHeight());
-    metersLabel.setBounds (juce::Rectangle<int> (meterArea.getX(), boxTop, meterArea.getWidth(), meterHeaderBottom - boxTop));
-
-    auto slot1 = juce::Rectangle<int> (
-        juce::roundToInt (meterSlot1LeftFrac * (float) bounds.getWidth()), meterHeaderBottom,
-        juce::roundToInt ((meterSlot1RightFrac - meterSlot1LeftFrac) * (float) bounds.getWidth()),
-        boxBottom - meterHeaderBottom);
-
-    auto slot2 = juce::Rectangle<int> (
-        juce::roundToInt (meterSlot2LeftFrac * (float) bounds.getWidth()), meterHeaderBottom,
-        juce::roundToInt ((meterSlot2RightFrac - meterSlot2LeftFrac) * (float) bounds.getWidth()),
-        boxBottom - meterHeaderBottom);
-
-    inputMeter.setBounds  (slot1.reduced (px (4)));
-    outputMeter.setBounds (slot2.reduced (px (4)));
-
-    // The dB scale goes in the printed gap BETWEEN the two slots - the
-    // margins outside the slots are only ~10px wide, which clips "-12" and
-    // friends even at a tiny font size.
-    meterScaleBounds = juce::Rectangle<int> (slot1.getRight(), meterHeaderBottom,
-                                              slot2.getX() - slot1.getRight(), boxBottom - meterHeaderBottom);
+    auto macroCol = advancedRow;
+    layoutMacro (macroCol.removeFromLeft (colWidth), presenceNameLabel, presenceSlider, presenceValueLabel);
+    macroCol.removeFromLeft (gap9);
+    layoutMacro (macroCol.removeFromLeft (colWidth), attackNameLabel, attackSlider, attackValueLabel);
+    macroCol.removeFromLeft (gap9);
+    layoutMacro (macroCol.removeFromLeft (colWidth), harmonicNameLabel, harmonicSlider, harmonicValueLabel);
+    macroCol.removeFromLeft (gap9);
+    layoutMacro (macroCol, sustainNameLabel, sustainSlider, sustainValueLabel);
 
 #if STRINGLIFE_ENABLE_LICENSING
-    licenseOverlay.setBounds (bounds);
+    auto fullBounds = getLocalBounds();
+    licenseOverlay.setBounds (fullBounds);
 
-    auto overlayArea = bounds.reduced (px (110), px (160));
+    // Proportional to the window regardless of design-space base, so this
+    // secondary dialog (not part of the mockup itself) keeps the same look
+    // it always had rather than drifting when designWidth/Height changed.
+    auto overlayArea = fullBounds.reduced (juce::roundToInt (fullBounds.getWidth() * 0.196f),
+                                           juce::roundToInt (fullBounds.getHeight() * 0.32f));
     licenseOverlayTitleLabel.setBounds (overlayArea.getX() + px (16), overlayArea.getY() + px (18),
                                         overlayArea.getWidth() - px (32), px (26));
     licenseOverlayStatusLabel.setBounds (overlayArea.getX() + px (20), overlayArea.getY() + px (54),
@@ -704,10 +808,10 @@ void StringLifeAudioProcessorEditor::resized()
 
     auto buttonRow = juce::Rectangle<int> (overlayArea.getX() + px (38), overlayArea.getBottom() - px (54),
                                            overlayArea.getWidth() - px (76), px (28));
-    auto gap = px (10);
-    auto buttonWidth = (buttonRow.getWidth() - gap) / 2;
+    auto buttonGap = px (10);
+    auto buttonWidth = (buttonRow.getWidth() - buttonGap) / 2;
     activateButton.setBounds (buttonRow.removeFromLeft (buttonWidth));
-    buttonRow.removeFromLeft (gap);
+    buttonRow.removeFromLeft (buttonGap);
     trialButton.setBounds (buttonRow.removeFromLeft (buttonWidth));
 #endif
 }

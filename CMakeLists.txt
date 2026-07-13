@@ -133,4 +133,8 @@ target_link_libraries(StringLife
 
 if (STRINGLIFE_ENABLE_LICENSING)
     target_link_libraries(StringLife PRIVATE juce::juce_cryptography)
+
+    if (APPLE)
+        target_link_libraries(StringLife PRIVATE "-framework SystemConfiguration")
+    endif()
 endif()

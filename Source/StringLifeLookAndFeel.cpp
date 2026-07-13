@@ -276,3 +276,22 @@ juce::Font StringLifeLookAndFeel::getTextButtonFont (juce::TextButton&, int butt
     // together with the resizable UI.
     return StringLifeFonts::uiMedium ((float) buttonHeight * 0.47f);
 }
+
+void StringLifeLookAndFeel::drawLabel (juce::Graphics& g, juce::Label& label)
+{
+    if (label.getProperties().contains (fieldValuePropertyKey))
+    {
+        // .moth-field: dark translucent fill + thin border, rounded corners
+        // - the advanced-knob and Mix numeric readouts sit inside one of
+        // these in the mockup, unlike the big free-floating Revival value.
+        auto bounds = label.getLocalBounds().toFloat();
+
+        g.setColour (juce::Colour (0xff030407).withAlpha (0.82f));
+        g.fillRoundedRectangle (bounds, 3.0f);
+
+        g.setColour (juce::Colour (0xff303540));
+        g.drawRoundedRectangle (bounds.reduced (0.5f), 3.0f, 1.0f);
+    }
+
+    LookAndFeel_V4::drawLabel (g, label);
+}

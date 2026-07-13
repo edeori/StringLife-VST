@@ -55,7 +55,6 @@ private:
     void updateFonts (float scale);
     void updateInstrumentButtons();
     void updateMonitorButtons();
-    void updateCompareButtonLabel();
     void updateAdvancedLabel (juce::Label& valueLabel, juce::Slider& slider);
 
 #if STRINGLIFE_ENABLE_LICENSING
@@ -66,7 +65,7 @@ private:
 
     void drawPanelFrame (juce::Graphics& g);
     void drawLogo (juce::Graphics& g, juce::Rectangle<float> bounds);
-    void drawMeterScale (juce::Graphics& g);
+    void drawStringArt (juce::Graphics& g, juce::Rectangle<int> bounds);
 
     static juce::String withLetterSpacing (const juce::String& text);
 
@@ -78,33 +77,44 @@ private:
 
     juce::Label manufacturerLabel;
     juce::Label titleLabel;
+    juce::Label taglineLabel;
 
     juce::TextButton guitarButton { "GUITAR" };
     juce::TextButton bassButton   { "BASS" };
 
+    // String age panel: title/kicker header, decorative "strings" backdrop,
+    // Revival readout, then the macro slider with its three range labels.
+    juce::Label stringAgeTitleLabel, macroControlKicker;
+    juce::Label revivalKicker, stringAgeValueLabel;
     juce::Slider stringAgeSlider;
-    juce::Label deadLabel, freshLabel, stringAgeValueLabel;
+    juce::Label deadLabel, balancedLabel, freshLabel;
 
     juce::Slider presenceSlider, attackSlider, harmonicSlider, sustainSlider;
     juce::Label presenceNameLabel, attackNameLabel, harmonicNameLabel, sustainNameLabel;
     juce::Label presenceValueLabel, attackValueLabel, harmonicValueLabel, sustainValueLabel;
 
-    juce::Label monitorLabel;
+    // Monitor Normal/Delta now lives top-right of the title row, not in a
+    // separate bottom box - see the refreshed mockup.
+    juce::Label monitorKicker;
     juce::TextButton normalButton { "NORMAL" };
     juce::TextButton deltaButton  { "DELTA" };
 
     // Independent of the Normal/Delta radio pair above: BYPASS is a hard,
     // host-visible on/off; A/B is a quick compare toggle whose label always
     // shows which side ("A" = processed, "B" = dry) you're currently hearing.
+    // Both now live in the header, next to the version number.
     juce::TextButton bypassButton { "BYPASS" };
-    juce::TextButton abButton     { "A" };
+    juce::TextButton abButton     { "A / B" };
 
-    juce::Slider wetDrySlider;
-    juce::Label wetDryLabel;
-
-    juce::Label metersLabel;
+    // Input/Output panel (right column of the main row): title, two vertical
+    // meters with their own In/Out kickers, and the Mix knob + field.
+    juce::Label ioTitleLabel;
+    juce::Label inKicker, outKicker;
     LevelMeter inputMeter;
     LevelMeter outputMeter;
+
+    juce::Slider wetDrySlider;
+    juce::Label wetDryLabel, wetDryValueLabel;
 
 #if STRINGLIFE_ENABLE_LICENSING
     LicenseOverlayComponent licenseOverlay;
@@ -117,9 +127,10 @@ private:
 
     juce::Label versionLabel;
 
-    // Bounds cached by resized() so paint() can draw the logo and meter
-    // scale where the components laid out around them actually are.
-    juce::Rectangle<int> meterScaleBounds;
+    // Bounds cached by resized() so paint() can draw the logo and the
+    // decorative string art where the components laid out around them
+    // actually are.
+    juce::Rectangle<int> stringArtBounds;
     juce::Rectangle<float> logoBounds;
 
     using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;

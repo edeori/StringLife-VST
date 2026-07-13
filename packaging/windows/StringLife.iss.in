@@ -32,14 +32,18 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked
 
+[Components]
+Name: "standalone"; Description: "Standalone application"
+Name: "vst3"; Description: "VST3 plug-in"
+
 [Files]
-Source: "{#MyBuildRoot}\Standalone\StringLife.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#MyBuildRoot}\Standalone\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "{#MyBuildRoot}\VST3\StringLife.vst3\*"; DestDir: "{commoncf64}\VST3\StringLife.vst3"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#MyBuildRoot}\Standalone\StringLife.exe"; DestDir: "{app}"; Flags: ignoreversion; Components: standalone
+Source: "{#MyBuildRoot}\Standalone\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: standalone
+Source: "{#MyBuildRoot}\VST3\StringLife.vst3\*"; DestDir: "{commoncf64}\VST3\StringLife.vst3"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: vst3
 
 [Icons]
-Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Components: standalone
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon; Components: standalone
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent; Components: standalone

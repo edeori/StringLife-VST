@@ -12,11 +12,20 @@ class StringLifeLookAndFeel : public juce::LookAndFeel_V4
 public:
     StringLifeLookAndFeel();
 
-    static juce::Colour getAccentColour() { return juce::Colour (0xff2fd3ff); }
+    // Mockup's own --accent/--accent-hot (Mockup/stringlife-ui.html) - a
+    // mint/teal, not the house cyan default other plugins use, since this
+    // mockup explicitly overrides it.
+    static juce::Colour getAccentColour()    { return juce::Colour (0xff80d7be); }
+    static juce::Colour getAccentHotColour() { return juce::Colour (0xffb5ffe9); }
 
-    // Guitar/Bass use their own distinct button render, not the generic
-    // Monitor-grid on/off pair - call this once per button in the editor to
-    // opt it into that asset pair.
+    // moth-section-title colour (near-white, not gold - confirmed directly
+    // against the mockup rather than assumed).
+    static juce::Colour getSectionTitleColour() { return juce::Colour (0xffd6d9df); }
+
+    // Guitar/Bass and Normal/Delta are both simple two-way pill-tab
+    // selectors sharing one visual role in the mockup (.moth-tab) - call
+    // this once per button in the editor to opt it into that shared asset
+    // pair rather than the plain rect button chrome below.
     static void markAsInstrumentButton (juce::Button& button) { button.getProperties().set (instrumentButtonPropertyKey, true); }
 
     // For toggles like A/B that don't have a meaningful "off" state (both
@@ -24,6 +33,11 @@ public:
     // always render with the active/glowing artwork regardless of the
     // button's own toggle state.
     static void markAsAlwaysActive (juce::Button& button) { button.getProperties().set (alwaysActivePropertyKey, true); }
+
+    // Small numeric readouts under the advanced knobs and the Mix knob use
+    // a bordered dark "field" box (.moth-field in the mockup), unlike the
+    // large free-floating Revival percentage - mark just those labels.
+    static void markAsFieldValue (juce::Label& label) { label.getProperties().set (fieldValuePropertyKey, true); }
 
     void drawRotarySlider (juce::Graphics& g, int x, int y, int width, int height,
                            float sliderPosProportional, float rotaryStartAngle, float rotaryEndAngle,
@@ -41,9 +55,12 @@ public:
 
     juce::Font getTextButtonFont (juce::TextButton&, int buttonHeight) override;
 
+    void drawLabel (juce::Graphics& g, juce::Label& label) override;
+
 private:
     static constexpr const char* instrumentButtonPropertyKey = "stringLifeInstrumentButton";
     static constexpr const char* alwaysActivePropertyKey = "stringLifeAlwaysActive";
+    static constexpr const char* fieldValuePropertyKey = "stringLifeFieldValue";
 
     // Real rendered assets (Assets/*.png, embedded via juce_add_binary_data).
     // The knob face and slider thumb are single fixed-rotation renders, so
