@@ -1,8 +1,0 @@
-build/
-build-*/
-cmake-build-*/
-.vs/
-.vscode/
-*.xcodeproj/
-*.xcuserstate
-.DS_Store
