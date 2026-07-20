@@ -9,6 +9,7 @@
  #include <windows.h>
  #include <bcrypt.h>
  #pragma comment(lib, "bcrypt.lib")
+ #pragma comment(lib, "advapi32.lib")
 #endif
 
 namespace licensing
@@ -69,19 +70,31 @@ juce::String getStableMachineName()
 
     return juce::SystemStats::getComputerName().trim();
 }
-#endif
-}
-
-juce::String MachineFingerprint::createMachineIdHash()
+#elif JUCE_WINDOWS
+juce::String getStableMachineId()
 {
-    juce::StringArray parts;
-    parts.add (juce::SystemStats::getOperatingSystemName());
+    HKEY key = nullptr;
 
-   #if JUCE_MAC
-    parts.add (getStableMachineName());
-   #else
-    parts.add (juce::SystemStats::getComputerName());
+    if (RegOpenKeyExW (HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Cryptography", 0,
+                        KEY_QUERY_VALUE | KEY_WOW64_64KEY, &key) == ERROR_SUCCESS)
+    {
+        wchar_t buffer[64] {};
+        DWORD size = sizeof (buffer);
+        DWORD type = 0;
+        const auto queried = RegQueryValueExW (key, L"MachineGuid", nullptr, &type,
+                                                reinterpret_cast<LPBYTE> (buffer), &size);
+        RegCloseKey (key);
 
+        if (queried == ERROR_SUCCESS && type == REG_SZ)
+        {
+            const auto guid = juce::String (buffer).trim();
+
+            if (guid.isNotEmpty())
+                return guid;
+        }
+    }
+
+    // Registry MachineGuid unreadable: fall back to a MAC-address fingerprint (unstable across adapter changes).
     juce::Array<juce::MACAddress> macAddresses;
     juce::MACAddress::findAllAddresses (macAddresses);
     juce::StringArray normalisedAddresses;
@@ -95,7 +108,21 @@ juce::String MachineFingerprint::createMachineIdHash()
     }
 
     normalisedAddresses.sort (true);
-    parts.addArray (normalisedAddresses);
+    return normalisedAddresses.joinIntoString ("|");
+}
+#endif
+}
+
+juce::String MachineFingerprint::createMachineIdHash()
+{
+    juce::StringArray parts;
+    parts.add (juce::SystemStats::getOperatingSystemName());
+
+   #if JUCE_MAC
+    parts.add (getStableMachineName());
+   #elif JUCE_WINDOWS
+    parts.add (juce::SystemStats::getComputerName());
+    parts.add (getStableMachineId());
    #endif
 
     const auto raw = parts.joinIntoString ("|");
