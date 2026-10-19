@@ -20,3 +20,8 @@ $installers = @(Get-ChildItem build/licensed/installer/*-Setup.exe)
 if ($installers.Count -ne 1) { throw 'Expected exactly one Windows installer' }
 New-Item -ItemType Directory -Force dist | Out-Null
 Copy-Item $installers[0].FullName dist/installer.exe
+
+cmake --build build/ci --config Release --target MothFingerprintTests --parallel 4
+if ($LASTEXITCODE -ne 0) { throw 'Fingerprint test build failed' }
+ctest --test-dir build/ci -C Release -R machine-fingerprint --output-on-failure
+if ($LASTEXITCODE -ne 0) { throw 'Fingerprint test failed' }

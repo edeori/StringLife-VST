@@ -42,13 +42,15 @@ For a normal macOS installer (`next -> next -> finish`), build a `.pkg`:
 
 ```bash
 ./package.sh licensed
-./package.sh local-dev
+./package.sh dev
 ```
 
 This creates:
 
-- `build/licensed/StringLife-licensed.pkg`
-- `build/local-dev/StringLife-local-dev.pkg`
+- `build/Release/licensed/StringLife-1.6.3.pkg`
+- `build/Release/dev/StringLife-1.6.3-dev.pkg`
+
+The filename and installer metadata automatically use the CMake project version.
 
 The installer places the plugin system-wide into:
 
@@ -100,6 +102,10 @@ This script:
 - checks the expected build outputs
 - generates an `.iss` installer script from `packaging/windows/StringLife.iss.in`
 - invokes Inno Setup if `ISCC.exe` is installed
+
+The installer is named `StringLife-1.6.3-licensed-Setup.exe` (or
+`StringLife-1.6.3-local-dev-Setup.exe`). The version defaults to the CMake
+project version and can be overridden with `-Version`.
 
 Default Inno Setup location:
 

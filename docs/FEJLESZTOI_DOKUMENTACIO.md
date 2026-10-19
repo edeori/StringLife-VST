@@ -356,8 +356,9 @@ automatikusan a felhasználói plug-in könyvtárakba is települ
 ./package.sh dev
 ```
 
-Kimenet: `build/Release/licensed/StringLife.pkg`, illetve
-`build/Release/dev/StringLife-dev.pkg`. A csomag rendszerszinten települ:
+Kimenet: `build/Release/licensed/StringLife-1.6.3.pkg`, illetve
+`build/Release/dev/StringLife-1.6.3-dev.pkg`. A verziószámot a script
+automatikusan a CMake buildből olvassa ki. A csomag rendszerszinten települ:
 `/Library/Audio/Plug-Ins/VST3/StringLife.vst3`,
 `/Library/Audio/Plug-Ins/Components/StringLife.component`,
 `/Applications/Moth Production/StringLife.app`. A `.pkg` jelenleg

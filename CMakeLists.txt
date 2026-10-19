@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(StringLife VERSION 1.6.2)
+project(StringLife VERSION 1.6.3)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -135,6 +135,19 @@ if (STRINGLIFE_ENABLE_LICENSING)
     target_link_libraries(StringLife PRIVATE juce::juce_cryptography)
 
     if (APPLE)
-        target_link_libraries(StringLife PRIVATE "-framework SystemConfiguration")
+        target_link_libraries(StringLife PRIVATE "-framework IOKit")
     endif()
 endif()
+
+# Exercise the production machine identity on both release runners.
+enable_testing()
+juce_add_console_app(MothFingerprintTests PRODUCT_NAME "Machine Fingerprint Tests")
+target_sources(MothFingerprintTests PRIVATE Tests/MachineFingerprintTests.cpp Source/Licensing/MachineFingerprint.cpp)
+target_include_directories(MothFingerprintTests PRIVATE Source)
+target_compile_features(MothFingerprintTests PRIVATE cxx_std_17)
+target_compile_definitions(MothFingerprintTests PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+target_link_libraries(MothFingerprintTests PRIVATE juce::juce_core juce::juce_cryptography)
+if(APPLE)
+    target_link_libraries(MothFingerprintTests PRIVATE "-framework IOKit")
+endif()
+add_test(NAME machine-fingerprint COMMAND MothFingerprintTests)

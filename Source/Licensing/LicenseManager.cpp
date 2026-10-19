@@ -104,6 +104,15 @@ bool LicenseManager::initialise (const LicenseConfig& configToUse, juce::String&
     store = std::make_unique<LicenseStore> (config);
     client = std::make_unique<LicenseClient> (config);
     const auto currentMachineId = MachineFingerprint::createMachineIdHash();
+
+    if (currentMachineId.isEmpty())
+    {
+        errorMessage = "Could not read a stable machine identifier";
+        cachedStatus.store ((int) LicenseStatus::ActivationRequired);
+        cachedMessage = errorMessage;
+        return false;
+    }
+
     state.machineIdHash = currentMachineId;
 
     if (! store->load (state, errorMessage))
