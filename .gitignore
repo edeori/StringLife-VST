@@ -8,3 +8,6 @@ cmake-build-*/
 .DS_Store
 dist/
 __pycache__/
+
+# Local agent workspace state
+.serena/
