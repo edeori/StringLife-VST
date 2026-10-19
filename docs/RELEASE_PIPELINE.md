@@ -49,3 +49,11 @@ Ellenőrizve: tokenes API 200; hibás token 401; POST 405; ismeretlen termék 40
 A kijelölt jóváhagyó `edeori`. A sikeres build után: **Review deployments → production → Approve and deploy**. Saját indítás jóváhagyható; admin bypass nincs engedélyezve. A `publish=false` teszt nem kér jóváhagyást és nem tölt fel.
 
 A jóváhagyási kapu tesztje: [39252600197](https://github.com/edeori/StringLife-VST/actions/runs/39252600197). A job `waiting` állapotban állt meg, a pending deployment reviewer `edeori` volt. A próba feltöltést nem végzett, ellenőrzés után megszakítottuk.
+
+## Live versioned release — 2026-10-19
+
+Version **1.6.4**, built source `0bfd3e719aa80cd273ab42ce4ab2ac9da6300fcc`.
+[Build](https://github.com/edeori/StringLife-VST/actions/runs/39309402255) and [publication](https://github.com/edeori/StringLife-VST/actions/runs/39309402255) succeeded for macOS and Windows.
+The published Mac package version and Windows ProductVersion were verified; the
+live EXE SHA-256 matches the clean Defender report. Shop version updated after
+publication. See the [shared release record](https://github.com/edeori/vst-release-pipeline/blob/main/docs/releases/2026-10-19-version-rollout.md) for all products and hashes.
