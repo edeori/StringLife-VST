@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: Replace live MinIO installers after both builds succeed
+        description: Request production approval after both builds succeed
         type: boolean
         default: false
   push:
@@ -12,7 +12,7 @@ permissions:
   contents: read
 jobs:
   release:
-    uses: edeori/vst-release-pipeline/.github/workflows/vst-release.yml@71447cac10956a233067956f24254456e8359726
+    uses: edeori/vst-release-pipeline/.github/workflows/vst-release.yml@ca7b591be49e0333f1d76e332de8d6a2b81452a6
     with:
       product-id: stringlife
       publish: ${{ github.event_name == 'push' || inputs.publish }}

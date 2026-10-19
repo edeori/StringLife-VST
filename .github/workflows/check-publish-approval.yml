@@ -1,0 +1,11 @@
+name: Verify publish approval gate
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  approval-check:
+    runs-on: ubuntu-24.04
+    environment: production
+    steps:
+      - run: echo 'Approval gate opened; this check never uploads installers.'
