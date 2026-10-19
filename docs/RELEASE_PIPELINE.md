@@ -72,3 +72,13 @@ Referenciák: [GitHub reusable workflows](https://docs.github.com/en/actions/how
 - A meglévő `StringLife.pkg` másolata az új `StringLife-Installer.pkg` címen is elérhető. A Windows URL csak az első sikeres publikálás után működik.
 - A szerver eredeti `.env`, compose, Shop oldal és blueprint mentése: `.deploy-backups/release-pipeline-20261019/` (csak root hozzáféréssel).
 - A tanúsítványok, registry-token és korlátozott MinIO-hitelesítők GitHub Secretsben vannak. A notarizációhoz az `APPLE_APP_PASSWORD` is szükséges; a helyi `moth-notary` profilt a runner nem éri el.
+
+### Első ellenőrzés eredménye
+
+- Python registry validáció: 4 teszt sikeres.
+- PHP registry konfiguráció: helyes termék + 7 hibás bemenet sikeresen ellenőrizve a szerver PHP 8.3 környezetében.
+- Workflow: actionlint hibamentes; Bash és PowerShell szintaxisellenőrzés sikeres.
+- Éles API: hitelesített GET 200; hibás token 401; POST 405; ismeretlen termék 404.
+- HTTPS MinIO feltöltés/visszaolvasás sikeres, más termék alá írás tiltva.
+- Első GitHub tesztfutás: https://github.com/edeori/StringLife-VST/actions/runs/39247982054 . A futás a kötelező `APPLE_APP_PASSWORD` secret hiánya miatt még a jobok indulása előtt megállt. Teljes platformbuild és új telepítők publikálása nem történt.
+- Folytatás: az Apple app-jelszó beállítása után `gh workflow run release.yml --repo edeori/StringLife-VST --ref main -f publish=false`. Sikeres teszt után `publish=true` készíti el és publikálja mindkét telepítőt.
