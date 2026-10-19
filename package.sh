@@ -6,7 +6,6 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 PROFILE="${1:-licensed}"
 PACKAGE_NAME="StringLife"
 IDENTIFIER_BASE="com.mothproduction.stringlife"
-VERSION="1.6.2"
 
 CODESIGN_IDENTITY="${CODESIGN_IDENTITY:-Developer ID Application: Márton Ferenczi (Y8272MS92K)}"
 INSTALLER_IDENTITY="${INSTALLER_IDENTITY:-Developer ID Installer: Márton Ferenczi (Y8272MS92K)}"
@@ -24,13 +23,19 @@ esac
 ./build.sh "$PROFILE"
 
 BUILD_DIR="build/Release/$PROFILE"
+VERSION="$(sed -n 's/^CMAKE_PROJECT_VERSION:STATIC=//p' "$BUILD_DIR/CMakeCache.txt")"
+if [[ ! "$VERSION" =~ ^[0-9]+(\.[0-9]+){0,3}$ ]]; then
+  echo "Could not read the project version from $BUILD_DIR/CMakeCache.txt" >&2
+  exit 1
+fi
+
 PKG_DIR="$BUILD_DIR/pkg"
 COMPONENTS_DIR="$PKG_DIR/components"
 
 if [[ "$PROFILE" == "licensed" ]]; then
-  OUTPUT_PKG="$BUILD_DIR/${PACKAGE_NAME}.pkg"
+  OUTPUT_PKG="$BUILD_DIR/${PACKAGE_NAME}-${VERSION}.pkg"
 else
-  OUTPUT_PKG="$BUILD_DIR/${PACKAGE_NAME}-${PROFILE}.pkg"
+  OUTPUT_PKG="$BUILD_DIR/${PACKAGE_NAME}-${VERSION}-${PROFILE}.pkg"
 fi
 
 APP_SOURCE="$BUILD_DIR/Standalone/StringLife.app"

@@ -2,13 +2,22 @@ param(
     [ValidateSet("licensed", "local-dev")]
     [string]$Profile = "licensed",
 
-    [string]$Version = "1.6.2"
+    [string]$Version = ""
 )
 
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $projectRoot
+
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    $cmakeContents = Get-Content (Join-Path $projectRoot "CMakeLists.txt") -Raw
+    $versionMatch = [regex]::Match($cmakeContents, '(?i)project\s*\(\s*StringLife\s+VERSION\s+([0-9]+(?:\.[0-9]+){0,3})(?=\s|\))')
+    if (-not $versionMatch.Success) {
+        throw "Could not read the StringLife project version from CMakeLists.txt"
+    }
+    $Version = $versionMatch.Groups[1].Value
+}
 
 $buildRoot = Join-Path $projectRoot "build\$Profile"
 $templatePath = Join-Path $projectRoot "packaging\windows\StringLife.iss.in"
@@ -24,11 +33,11 @@ $requiredPaths = @(
     (Join-Path $buildRoot "VST3\StringLife.vst3")
 )
 
-$isWindows = $PSVersionTable.Platform -eq "Win32NT" -or $env:OS -eq "Windows_NT"
+$runningOnWindows = $PSVersionTable.Platform -eq "Win32NT" -or $env:OS -eq "Windows_NT"
 
 foreach ($path in $requiredPaths) {
     if (-not (Test-Path $path)) {
-        if ($isWindows) {
+        if ($runningOnWindows) {
             throw "Missing build artefact: $path`nBuild the Windows targets first so build\$Profile contains StringLife.exe and StringLife.vst3."
         }
 
@@ -67,6 +76,9 @@ if ([string]::IsNullOrWhiteSpace($iscc) -or -not (Test-Path $iscc)) {
 }
 
 & $iscc $generatedIss
+if ($LASTEXITCODE -ne 0) {
+    throw "Inno Setup failed with exit code $LASTEXITCODE"
+}
 
 Write-Host
 Write-Host "==> Windows installer created under:"
