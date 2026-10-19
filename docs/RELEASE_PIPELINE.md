@@ -44,4 +44,4 @@ A szerver: `mothstack`, webgyökér: `/srv/mothproduction-web`. A 2026-10-19-i A
 
 Ellenőrizve: tokenes API 200; hibás token 401; POST 405; ismeretlen termék 404; külső HTTPS MinIO-feltöltés és publikus visszaolvasás; más termék prefixére írás tiltása. A korábbi központi tesztben a Windows EXE és aláírt, notarizált macOS PKG is elkészült; az új reusable workflow tesztje már a StringLife Actions felületén látható.
 
-2026-10-19: a [StringLife saját reusable workflow-tesztje](https://github.com/edeori/StringLife-VST/actions/runs/39251229057) sikeres. A Windows EXE és az aláírt, notarizált macOS PKG a StringLife artifactjai között elérhető; a jobok figyelmeztetés nélkül zárultak. Forráscommit: `b67a51a` (1.6.2). A teszt nem publikált a MinIO-ba.
+2026-10-19: a [StringLife saját reusable workflow-tesztje](https://github.com/edeori/StringLife-VST/actions/runs/39251229057) sikeres. A Windows EXE és az aláírt, notarizált macOS PKG a StringLife artifactjai között elérhető; a korábbi Node.js 20-as figyelmeztetés megszűnt (csak macOS runner-kapacitásról szóló tájékoztató notice maradt). Forráscommit: `b67a51a` (1.6.2). A teszt nem publikált a MinIO-ba.
