@@ -12,7 +12,7 @@ permissions:
   contents: read
 jobs:
   release:
-    uses: edeori/vst-release-pipeline/.github/workflows/vst-release.yml@0c1ed01b9359dd5ec9d1f92b42a9e563a9265f83
+    uses: edeori/vst-release-pipeline/.github/workflows/vst-release.yml@95a7192a8b926363a6b864ed2a7c66b14ecd125f
     with:
       product-id: stringlife
       publish: ${{ github.event_name == 'push' || inputs.publish }}
