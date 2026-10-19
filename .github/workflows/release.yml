@@ -7,15 +7,16 @@ on:
         type: boolean
         default: false
   push:
+    branches: [main]
     tags: ['v*']
 permissions:
-  contents: read
+  contents: write
 jobs:
   release:
-    uses: edeori/vst-release-pipeline/.github/workflows/vst-release.yml@95a7192a8b926363a6b864ed2a7c66b14ecd125f
+    uses: edeori/vst-release-pipeline/.github/workflows/vst-release.yml@87842d30522e76111d68b91e50a55759336ba201
     with:
       product-id: stringlife
-      publish: ${{ github.event_name == 'push' || inputs.publish }}
+      publish: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.publish }}
     secrets:
       REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
       APPLE_CERTIFICATES_P12: ${{ secrets.APPLE_CERTIFICATES_P12 }}
