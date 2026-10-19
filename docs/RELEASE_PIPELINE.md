@@ -43,3 +43,5 @@ A macOS URL-en a korábbi telepítő másolata már elérhető; a Windows URL az
 A szerver: `mothstack`, webgyökér: `/srv/mothproduction-web`. A 2026-10-19-i API-telepítés előtti fájlmentések: `.deploy-backups/release-pipeline-20261019/`. A Grav konténer továbbítja a `RELEASE_REGISTRY_TOKEN` környezeti változót. Cache-kezelés a konténer indulása után `1000:1000` felhasználóval történjen.
 
 Ellenőrizve: tokenes API 200; hibás token 401; POST 405; ismeretlen termék 404; külső HTTPS MinIO-feltöltés és publikus visszaolvasás; más termék prefixére írás tiltása. A korábbi központi tesztben a Windows EXE és aláírt, notarizált macOS PKG is elkészült; az új reusable workflow tesztje már a StringLife Actions felületén látható.
+
+2026-10-19: a [StringLife saját reusable workflow-tesztje](https://github.com/edeori/StringLife-VST/actions/runs/39251229057) sikeres. A Windows EXE és az aláírt, notarizált macOS PKG a StringLife artifactjai között elérhető; a jobok figyelmeztetés nélkül zárultak. Forráscommit: `b67a51a` (1.6.2). A teszt nem publikált a MinIO-ba.
