@@ -1,0 +1,27 @@
+name: Release installers
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Replace live MinIO installers after both builds succeed
+        type: boolean
+        default: false
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  release:
+    uses: edeori/vst-release-pipeline/.github/workflows/vst-release.yml@71447cac10956a233067956f24254456e8359726
+    with:
+      product-id: stringlife
+      publish: ${{ github.event_name == 'push' || inputs.publish }}
+    secrets:
+      REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+      APPLE_CERTIFICATES_P12: ${{ secrets.APPLE_CERTIFICATES_P12 }}
+      APPLE_CERTIFICATES_PASSWORD: ${{ secrets.APPLE_CERTIFICATES_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY }}
+      MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY }}
