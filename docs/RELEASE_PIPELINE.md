@@ -47,3 +47,5 @@ Ellenőrizve: tokenes API 200; hibás token 401; POST 405; ismeretlen termék 40
 2026-10-19: a [StringLife saját reusable workflow-tesztje](https://github.com/edeori/StringLife-VST/actions/runs/39251229057) sikeres. A Windows EXE és az aláírt, notarizált macOS PKG a StringLife artifactjai között elérhető; a korábbi Node.js 20-as figyelmeztetés megszűnt (csak macOS runner-kapacitásról szóló tájékoztató notice maradt). Forráscommit: `b67a51a` (1.6.2). A teszt nem publikált a MinIO-ba.
 
 A kijelölt jóváhagyó `edeori`. A sikeres build után: **Review deployments → production → Approve and deploy**. Saját indítás jóváhagyható; admin bypass nincs engedélyezve. A `publish=false` teszt nem kér jóváhagyást és nem tölt fel.
+
+A jóváhagyási kapu tesztje: [39252600197](https://github.com/edeori/StringLife-VST/actions/runs/39252600197). A job `waiting` állapotban állt meg, a pending deployment reviewer `edeori` volt. A próba feltöltést nem végzett, ellenőrzés után megszakítottuk.
