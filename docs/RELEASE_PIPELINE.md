@@ -43,4 +43,4 @@ A macOS URL-en a korábbi telepítő másolata már elérhető; a Windows URL az
 
 A szerver: `mothstack`, webgyökér: `/srv/mothproduction-web`. A 2026-10-19-i API-telepítés előtti fájlmentések: `.deploy-backups/release-pipeline-20261019/`. A Grav konténer továbbítja a `RELEASE_REGISTRY_TOKEN` környezeti változót. Cache-kezelés a konténer indulása után `1000:1000` felhasználóval történjen.
 
-Ellenőrizve: tokenes API 200; hibás token 401; POST 405; ismeretlen termék 404; külső HTTPS MinIO-feltöltés és publikus visszaolvasás; más termék prefixére írás tiltása. A központi teljes platformbuild eredménye az Actions-futásban követhető.
+Ellenőrizve: tokenes API 200; hibás token 401; POST 405; ismeretlen termék 404; külső HTTPS MinIO-feltöltés és publikus visszaolvasás; más termék prefixére írás tiltása. Az első központi teljes platformbuild [sikeres](https://github.com/edeori/vst-release-pipeline/actions/runs/39248988586): Windows EXE és aláírt, notarizált macOS PKG artifact elkészült. A teszt forrása `8543b16` (1.6.2), a publikálás ki volt kapcsolva.
